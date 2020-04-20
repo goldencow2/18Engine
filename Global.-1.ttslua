@@ -2,154 +2,40 @@
 COMPANIES_CAN_CROSS_INVEST = true --Companies will have shares from other companies on their own charter, and the script should handle this.
 CROSS_INVESTED_SHARES_PAY = true --If, for some reason, your game allows companies to hold shares in other companies but those shares don't pay dividends.
 
+BANK_SIZE = 12000
+
+
 gameEntities = {
     ['SM'] = {
-        counter = '69a516',
-        treasury = 0,
-        zone = '88654d',
-        board = '5c990f',
-        label = '',
+        moneyLabelGUID = '69a516',
+        scriptingZoneGUID = '88654d',
+        charterGUID = '5c990f',
+        inputCounterGUID = '33f79c',
         num_shares=10,
-        adjust = '33f79c',
-        player = false,
-        minor = false,
-        charter = true,
-    },
-    ['IC'] = {
-        counter = 'c6ee6d',
-        treasury = 0,
-        zone = '6ec622',
-        board = '6d37e9',
-        label = '',
-        num_shares=10,
-        adjust = 'e63f1f',
-        player = false,
-        minor = false,
-        charter = true,
-    },
-    ['MV'] = {
-        counter = '6caf06',
-        treasury = 0,
-        zone = 'b2fcd8',
-        board = '0b58c7',
-        label = '',
-        num_shares=10,
-        adjust = '56e5c9',
-        player = false,
-        minor = false,
-        charter = true,
-    },
-    ['LP'] = {
-        counter = '667a6a',
-        treasury = 0,
-        zone = '995709',
-        board = 'aad939',
-        label = '',
-        num_shares=10,
-        adjust = '458f8d',
-        player = false,
-        minor = false,
-        charter = true,
-    },
-    ['DSE'] = {
-        counter = '0783fb',
-        treasury = 0,
-        zone = 'd67daf',
-        board = '1afbb5',
-        label = '',
-        num_shares=10,
-        adjust = '72d8ee',
-        player = false,
-        minor = false,
-        charter = true,
-    },
-    ['ME'] = {
-        counter = '5de150',
-        treasury = 0,
-        zone = '7ddbb8',
-        board = 'a18975',
-        label = '',
-        num_shares=10,
-        adjust = '0efb98',
-        player = false,
-        minor = false,
-        charter = true,
-    },
-    ['MA'] = {
-        counter = '7893ea',
-        treasury = 0,
-        zone = '1de537',
-        board = 'd4eae2',
-        label = '',
-        num_shares=10,
-        adjust = 'e18e07',
         player = false,
         minor = false,
         charter = true,
     },
     ['S1'] = {
-        counter = '2789eb',
-        treasury = 0,
-        label = 'Seat 1',
-        adjust = '2dc1ff',
-        player = true,
-    },
-    ['S2'] = {
-        counter = 'b29631',
-        treasury = 0,
-        label = 'Seat 2',
-        adjust = '5c2da4',
-        player = true,
-    },
-    ['S3'] = {
-        counter = '41571c',
-        treasury = 0,
-        label = 'Seat 3',
-        adjust = 'cdfbb8',
-        player = true,
-    },
-    ['S4'] = {
-        counter = 'f10682',
-        treasury = 0,
-        label = 'Seat 4',
-        adjust = 'c988cd',
-        player = true,
-    },
-    ['S5'] = {
-        counter = '26397d',
-        treasury = 0,
-        label = 'Seat 5',
-        adjust = 'a6d624',
+        moneyLabelGUID = '2789eb',
+        inputCounterGUID = '2dc1ff',
         player = true,
     },
     ['BANK'] = {
-        counter = '0ba963',
+        moneyLabelGUID = '0ba963',
         treasury = 37860,
-        label = 'Bank',
-        transactions = 'a796bf',
-        transtext = nil,
-        adjust = '',
+        transactionLog = 'a796bf',
         company = false
     },
 }
 
-newGameBoard = 'f6934b'
-newGameCounter = 'b01253'
-
 ipo_zone = '63a95f'
 bank_zone = '4ad93d'
 
-transactions = nil
+------------------------------------------------------------------------
 
-button6 = {}
-button6.click_function = 'NewGame'
-button6.function_owner = nil
-button6.label = 'New Game'
-button6.position = {0,1,5}
-button6.rotation = {0,0,0}
-button6.width = 4000
-button6.height = 2000
-button6.font_size = 1000
+
+transactions = nil
 
 counterbuttonbank = {}
 counterbuttonbank.click_function = 'buttonTransfer'
@@ -193,38 +79,36 @@ payfullbuttonbank.color = green
 -- payhalfbuttonbank.font_size = 50
 -- payhalfbuttonbank.iconColor = green
 
-function buttonWithold(object, colour)
-    charterButtonHelper(object, colour, 2)
+function buttonWithold(object, color)
+    charterButtonHelper(object, color, 2)
 end
 
-function buttonPay(object, colour)
-    charterButtonHelper(object, colour, 1)
+function buttonPay(object, color)
+    charterButtonHelper(object, color, 1)
 end
 
--- function buttonPayHalf(object, colour)
---     charterButtonHelper(object, colour, 3)
+-- function buttonPayHalf(object, color)
+--     charterButtonHelper(object, color, 3)
 -- end
 
-function buttonTransfer(object, colour)
-    charterButtonHelper(object, colour, 0)
+function buttonTransfer(object, color)
+    charterButtonHelper(object, color, 0)
 end
 
-function charterButtonHelper(object, colour, type)
+function charterButtonHelper(object, color, type)
 
-    for i,v in pairs(gameEntities) do
-        if object == getObjectFromGUID(v.adjust) then
-            amount = object.getValue()
-            if type == 0 then
-                transferMoney(i, 'BANK', amount, true)
-            elseif type == 1 then
-                Payout(amount, i)
-            elseif type == 2 then
-                Withold(amount, i)
-            elseif type == 3 then
-                Payout(amount/2, i)
-                Withold(amount/2, i)
-            end
-        end
+    local amount = object.getValue()
+    local key = object.getGMNotes()
+
+    if type == 0 then
+        transferMoney(key, 'BANK', amount, true)
+    elseif type == 1 then
+        Payout(amount, key)
+    elseif type == 2 then
+        Withold(amount, key)
+    elseif type == 3 then
+        Payout(amount/2, key)
+        Withold(amount/2, key)
     end
 
 end
@@ -238,30 +122,6 @@ function getPlayerId(color)
     end
 end
 
-function NewGame()
-    for i,v in pairs(gameEntities) do
-        v.treasury = 0
-    end
-    updateCounter()
-    x = getObjectFromGUID(newGameCounter).getValue()
-    if x == 3 then
-        assignTreasury({'S1', 'S2', 'S3'}, 540)
-        gameEntities['BANK'].treasury = 12000
-    elseif x == 4 then
-        assignTreasury({'S1', 'S2', 'S3', 'S4'}, 410)
-        gameEntities['BANK'].treasury = 12000
-    elseif x == 5 then
-        assignTreasury({'S1', 'S2', 'S3', 'S4', 'S5'}, 340)
-        gameEntities['BANK'].treasury = 12000
-    else
-        error("number of players can only be 3 through 5")
-    end
-    if x > 5 or x < 3 then
-        gameEntities['BANK'].treasury = 12000
-    end
-    updateCounter()
-end
-
 function assignTreasury(playerList, amount)
     for i=1, #playerList, 1 do
         gameEntities[playerList[i]].treasury = amount
@@ -269,8 +129,8 @@ function assignTreasury(playerList, amount)
 end
 
 function transferMoney(from, to, amount, log)
-        fromCounter = getObjectFromGUID(gameEntities[from].counter)
-    toCounter = getObjectFromGUID(gameEntities[to].counter)
+        fromCounter = getObjectFromGUID(gameEntities[from].moneyLabelGUID)
+    toCounter = getObjectFromGUID(gameEntities[to].moneyLabelGUID)
     gameEntities[to].treasury = gameEntities[to].treasury + amount
     gameEntities[from].treasury = gameEntities[from].treasury - amount
 
@@ -302,7 +162,7 @@ function logTransaction(amount, source, target, print)
         item = item + 1
         t = t.next
     end
-    getObjectFromGUID(gameEntities['BANK'].transactions).setDescription(transactionLog)
+    getObjectFromGUID(gameEntities['BANK'].transactionLog).setDescription(transactionLog)
 end
 
 function Payout(dividend, company)
@@ -332,7 +192,7 @@ function Payout(dividend, company)
 
     --tabulate shares on the company charter
     local company_obj_pile
-    company_obj_pile = getObjectFromGUID(gameEntities[company].zone).getObjects()
+    company_obj_pile = getObjectFromGUID(gameEntities[company].scriptingZoneGUID).getObjects()
     count = 0
     company_count = 0
     for i,v in pairs(company_obj_pile) do
@@ -357,7 +217,7 @@ function Payout(dividend, company)
             --check to see if this is a company and that it's not this company
             if (otherCompany.charter and k~=company) then
                 count = 0
-                objectPile = getObjectFromGUID(gameEntities[k].zone).getObjects()
+                objectPile = getObjectFromGUID(gameEntities[k].scriptingZoneGUID).getObjects()
                 for i,v in pairs(objectPile) do
                     name = v.getName()
                     quantity = v.getQuantity()
@@ -459,20 +319,23 @@ function Payout(dividend, company)
 end
 
 function onload(savedState)
-    newGameBoardObj = getObjectFromGUID(newGameBoard)
-    newGameBoardObj.createButton(button6)
-
     for k,v in pairs(gameEntities) do
-        --print(k .. ' ' .. v.adjust .. ' ' .. v.company)
-        if v.adjust != '' and v.player == false then
-            obj = getObjectFromGUID(v.adjust)
+
+        --default treasuries
+        if v.treasury == nil then v.treasury=0 end
+
+        --Give each inputCounter a tag linking it to its key
+        if v.inputCounterGUID then getObjectFromGUID(v.inputCounterGUID).setGMNotes(k) end
+
+        if v.inputCounterGUID != '' and v.player == false then
+            obj = getObjectFromGUID(v.inputCounterGUID)
             obj.createButton(counterbuttonbank)
             if v.minor == false then
             	obj.createButton(payfullbuttonbank)
             end
             obj.createButton(witholdbuttonbank)
-        elseif v.adjust != '' and v.player then
-            obj = getObjectFromGUID(v.adjust)
+        elseif v.inputCounterGUID != '' and v.player then
+            obj = getObjectFromGUID(v.inputCounterGUID)
             obj.createButton(counterbuttonbank)
         end
     end
@@ -510,17 +373,17 @@ function updateCounter()
         button_parameters.width = 0
         button_parameters.height = 0
         button_parameters.font_size = 700
-        getObjectFromGUID(entityName.counter).clearButtons()
-        getObjectFromGUID(entityName.counter).createButton(button_parameters)
+        getObjectFromGUID(entityName.moneyLabelGUID).clearButtons()
+        getObjectFromGUID(entityName.moneyLabelGUID).createButton(button_parameters)
     end
 end
 
 function update()
     --Make the scripting zone stick to the company charters
     for i, v in pairs(gameEntities) do
-        if v.zone and v.board and v.zone != '' and v.board != '' then
-            local z = getObjectFromGUID(v.zone)
-            local b = getObjectFromGUID(v.board)
+        if v.scriptingZoneGUID and v.charterGUID and v.scriptingZoneGUID != '' and v.charterGUID != '' then
+            local z = getObjectFromGUID(v.scriptingZoneGUID)
+            local b = getObjectFromGUID(v.charterGUID)
             z.setPosition(companyzoneupdate(z,b,0,0,0))
             local rotation = b.getRotation()
             z.setRotation(rotation)
