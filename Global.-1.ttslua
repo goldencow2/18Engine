@@ -1,0 +1,537 @@
+--select options
+COMPANIES_CAN_CROSS_INVEST = true --Companies will have shares from other companies on their own charter, and the script should handle this.
+CROSS_INVESTED_SHARES_PAY = true --If, for some reason, your game allows companies to hold shares in other companies but those shares don't pay dividends.
+
+gameEntities = {
+    ['SM'] = {
+        counter = '69a516',
+        treasury = 0,
+        zone = '88654d',
+        board = '5c990f',
+        label = '',
+        num_shares=10,
+        adjust = '33f79c',
+        player = false,
+        minor = false,
+        charter = true,
+    },
+    ['IC'] = {
+        counter = 'c6ee6d',
+        treasury = 0,
+        zone = '6ec622',
+        board = '6d37e9',
+        label = '',
+        num_shares=10,
+        adjust = 'e63f1f',
+        player = false,
+        minor = false,
+        charter = true,
+    },
+    ['MV'] = {
+        counter = '6caf06',
+        treasury = 0,
+        zone = 'b2fcd8',
+        board = '0b58c7',
+        label = '',
+        num_shares=10,
+        adjust = '56e5c9',
+        player = false,
+        minor = false,
+        charter = true,
+    },
+    ['LP'] = {
+        counter = '667a6a',
+        treasury = 0,
+        zone = '995709',
+        board = 'aad939',
+        label = '',
+        num_shares=10,
+        adjust = '458f8d',
+        player = false,
+        minor = false,
+        charter = true,
+    },
+    ['DSE'] = {
+        counter = '0783fb',
+        treasury = 0,
+        zone = 'd67daf',
+        board = '1afbb5',
+        label = '',
+        num_shares=10,
+        adjust = '72d8ee',
+        player = false,
+        minor = false,
+        charter = true,
+    },
+    ['ME'] = {
+        counter = '5de150',
+        treasury = 0,
+        zone = '7ddbb8',
+        board = 'a18975',
+        label = '',
+        num_shares=10,
+        adjust = '0efb98',
+        player = false,
+        minor = false,
+        charter = true,
+    },
+    ['MA'] = {
+        counter = '7893ea',
+        treasury = 0,
+        zone = '1de537',
+        board = 'd4eae2',
+        label = '',
+        num_shares=10,
+        adjust = 'e18e07',
+        player = false,
+        minor = false,
+        charter = true,
+    },
+    ['S1'] = {
+        counter = '2789eb',
+        treasury = 0,
+        label = 'Seat 1',
+        adjust = '2dc1ff',
+        player = true,
+    },
+    ['S2'] = {
+        counter = 'b29631',
+        treasury = 0,
+        label = 'Seat 2',
+        adjust = '5c2da4',
+        player = true,
+    },
+    ['S3'] = {
+        counter = '41571c',
+        treasury = 0,
+        label = 'Seat 3',
+        adjust = 'cdfbb8',
+        player = true,
+    },
+    ['S4'] = {
+        counter = 'f10682',
+        treasury = 0,
+        label = 'Seat 4',
+        adjust = 'c988cd',
+        player = true,
+    },
+    ['S5'] = {
+        counter = '26397d',
+        treasury = 0,
+        label = 'Seat 5',
+        adjust = 'a6d624',
+        player = true,
+    },
+    ['BANK'] = {
+        counter = '0ba963',
+        treasury = 37860,
+        label = 'Bank',
+        transactions = 'a796bf',
+        transtext = nil,
+        adjust = '',
+        company = false
+    },
+}
+
+newGameBoard = 'f6934b'
+newGameCounter = 'b01253'
+
+ipo_zone = '63a95f'
+bank_zone = '4ad93d'
+
+transactions = nil
+
+button6 = {}
+button6.click_function = 'NewGame'
+button6.function_owner = nil
+button6.label = 'New Game'
+button6.position = {0,1,5}
+button6.rotation = {0,0,0}
+button6.width = 4000
+button6.height = 2000
+button6.font_size = 1000
+
+counterbuttonbank = {}
+counterbuttonbank.click_function = 'buttonTransfer'
+counterbuttonbank.function_owner = nil
+counterbuttonbank.label = 'Bank Transfer'
+counterbuttonbank.position = {0,0.1,0.5}
+counterbuttonbank.rotation = {0,180,0}
+counterbuttonbank.width = 400
+counterbuttonbank.height = 100
+counterbuttonbank.font_size = 50
+
+witholdbuttonbank = {}
+witholdbuttonbank.click_function = 'buttonWithold'
+witholdbuttonbank.function_owner = nil
+witholdbuttonbank.label = 'Withold'
+witholdbuttonbank.position = {1,0.1,0}
+witholdbuttonbank.rotation = {0,180,0}
+witholdbuttonbank.width = 400
+witholdbuttonbank.height = 100
+witholdbuttonbank.font_size = 50
+
+payfullbuttonbank = {}
+payfullbuttonbank.click_function = 'buttonPay'
+payfullbuttonbank.function_owner = nil
+payfullbuttonbank.label = 'Payout'
+payfullbuttonbank.position = {-1,0.1,0}
+payfullbuttonbank.rotation = {0,180,0}
+payfullbuttonbank.width = 400
+payfullbuttonbank.height = 100
+payfullbuttonbank.font_size = 50
+payfullbuttonbank.color = green
+
+-- payhalfbuttonbank = {}
+-- payhalfbuttonbank.click_function = 'buttonPayHalf'
+-- payhalfbuttonbank.function_owner = nil
+-- payhalfbuttonbank.label = 'Pay Half'
+-- payhalfbuttonbank.position = {0,0.1, -0.5}
+-- payhalfbuttonbank.rotation = {0,180,0}
+-- payhalfbuttonbank.width = 400
+-- payhalfbuttonbank.height = 100
+-- payhalfbuttonbank.font_size = 50
+-- payhalfbuttonbank.iconColor = green
+
+function buttonWithold(object, colour)
+    charterButtonHelper(object, colour, 2)
+end
+
+function buttonPay(object, colour)
+    charterButtonHelper(object, colour, 1)
+end
+
+-- function buttonPayHalf(object, colour)
+--     charterButtonHelper(object, colour, 3)
+-- end
+
+function buttonTransfer(object, colour)
+    charterButtonHelper(object, colour, 0)
+end
+
+function charterButtonHelper(object, colour, type)
+
+    for i,v in pairs(gameEntities) do
+        if object == getObjectFromGUID(v.adjust) then
+            amount = object.getValue()
+            if type == 0 then
+                transferMoney(i, 'BANK', amount, true)
+            elseif type == 1 then
+                Payout(amount, i)
+            elseif type == 2 then
+                Withold(amount, i)
+            elseif type == 3 then
+                Payout(amount/2, i)
+                Withold(amount/2, i)
+            end
+        end
+    end
+
+end
+
+function getPlayerId(color)
+    if color == 'Red' then return 'S1'
+    elseif color == 'Brown' then return 'S2'
+    elseif color == 'White' then return 'S3'
+    elseif color == 'Green' then return 'S4'
+    elseif color == 'Blue' then return 'S5'
+    end
+end
+
+function NewGame()
+    for i,v in pairs(gameEntities) do
+        v.treasury = 0
+    end
+    updateCounter()
+    x = getObjectFromGUID(newGameCounter).getValue()
+    if x == 3 then
+        assignTreasury({'S1', 'S2', 'S3'}, 540)
+        gameEntities['BANK'].treasury = 12000
+    elseif x == 4 then
+        assignTreasury({'S1', 'S2', 'S3', 'S4'}, 410)
+        gameEntities['BANK'].treasury = 12000
+    elseif x == 5 then
+        assignTreasury({'S1', 'S2', 'S3', 'S4', 'S5'}, 340)
+        gameEntities['BANK'].treasury = 12000
+    else
+        error("number of players can only be 3 through 5")
+    end
+    if x > 5 or x < 3 then
+        gameEntities['BANK'].treasury = 12000
+    end
+    updateCounter()
+end
+
+function assignTreasury(playerList, amount)
+    for i=1, #playerList, 1 do
+        gameEntities[playerList[i]].treasury = amount
+    end
+end
+
+function transferMoney(from, to, amount, log)
+        fromCounter = getObjectFromGUID(gameEntities[from].counter)
+    toCounter = getObjectFromGUID(gameEntities[to].counter)
+    gameEntities[to].treasury = gameEntities[to].treasury + amount
+    gameEntities[from].treasury = gameEntities[from].treasury - amount
+
+    updateCounter()
+    if log then
+        logTransaction(amount, from, to, true)
+    end
+end
+
+function Withold(amount, company)
+    gameEntities[company].treasury = gameEntities[company].treasury + amount
+    gameEntities['BANK'].treasury = gameEntities['BANK'].treasury - amount
+    logTransaction(amount, 'BANK', company .. ' Tres', false)
+    printToAll('***** ' .. company .. ' WITHOLDS ' .. amount .. ' *****')
+    updateCounter()
+end
+
+function logTransaction(amount, source, target, print)
+    local str = os.date("%H:%M - ") .. 'Transferred ' .. amount .. ' from ' .. source .. ' to ' .. target
+    if print then
+        printToAll(str)
+    end
+    transactions = { next = transactions, value = str }
+    local t = transactions
+    local item = 0
+    local transactionLog = ''
+    while t and item < 10 do
+        transactionLog = transactionLog .. t.value .. '\n'
+        item = item + 1
+        t = t.next
+    end
+    getObjectFromGUID(gameEntities['BANK'].transactions).setDescription(transactionLog)
+end
+
+function Payout(dividend, company)
+    --tabulate shares in the players' hands
+    local objectPile
+    playerList = Player.getPlayers()
+    local total_count = 0
+    local quantity = 0
+    local player_payouts = {}
+    for i,player in ipairs(playerList) do
+        count = 0
+        objectPile = player.getHandObjects()
+        for i,v in pairs(objectPile) do
+            local name = objectPile[i].getName()
+            if name == company then
+                count = count + 1
+            elseif name == company .. 'P2' then
+                count = count + 2
+
+            end
+        end
+        total_count = total_count + count
+        if count > 0 then
+            player_payouts[player.color] = { count = count, name = player.steam_name }
+        end
+    end
+
+    --tabulate shares on the company charter
+    local company_obj_pile
+    company_obj_pile = getObjectFromGUID(gameEntities[company].zone).getObjects()
+    count = 0
+    company_count = 0
+    for i,v in pairs(company_obj_pile) do
+        name = v.getName()
+        quantity = v.getQuantity()
+        if name == company then
+            if quantity == -1 then
+                count = count + 1
+            else
+                count = count + quantity
+            end
+        end
+    end
+    company_count = count
+    total_count = total_count + count
+
+    --If companies can buy shares in other companies, tabulate shares on charters other than the acting company.
+    local cross_invest_payouts = {}
+    if COMPANIES_CAN_CROSS_INVEST then
+        local objectPile
+        for k,otherCompany in pairs(gameEntities) do
+            --check to see if this is a company and that it's not this company
+            if (otherCompany.charter and k~=company) then
+                count = 0
+                objectPile = getObjectFromGUID(gameEntities[k].zone).getObjects()
+                for i,v in pairs(objectPile) do
+                    name = v.getName()
+                    quantity = v.getQuantity()
+                    if name == company then
+                        if quantity == -1 then
+                            count = count + 1
+                        else
+                            count = count + quantity
+                        end
+                    end
+                end
+                total_count = total_count + count
+                if count > 0 then
+                    cross_invest_payouts[k] = {count=count, name=k}
+                end
+            end
+        end
+    end
+
+    --tabluate shares in the zone labeled IPO
+    count = 0
+    local ipo_objs
+    ipo_objs = getObjectFromGUID(ipo_zone).getObjects()
+    for i,v in pairs(ipo_objs) do
+        name = v.getName()
+        quantity = v.getQuantity()
+        if name == company then
+            if quantity == -1 then
+                count = count + 1
+            else
+                count = count + quantity
+            end
+
+        elseif name == company .. 'P' then
+            count = count + 2
+        end
+    end
+    total_count = total_count + count
+
+    --tabulate shares in the zone labeled bank pool
+    count = 0
+    local ipo_objs
+    ipo_objs = getObjectFromGUID(bank_zone).getObjects()
+    for i,v in pairs(ipo_objs) do
+        name = v.getName()
+        quantity = v.getQuantity()
+        if name == company then
+            if quantity == -1 then
+                count = count + 1
+            else
+                count = count + quantity
+            end
+
+        elseif name == company .. 'P' then
+            count = count + 2
+        end
+    end
+    total_count = total_count + count
+
+    --print(total_count)
+    --print(gameEntities[company].num_shares)
+    if total_count==gameEntities[company].num_shares then
+        printToAll("------ " .. company .. " pays " .. dividend .. " ------")
+
+        --pay the players
+        for k,v in pairs(player_payouts) do
+          adjustment = math.ceil(dividend*(v.count/gameEntities[company].num_shares))
+          transferMoney('BANK', getPlayerId(k), adjustment, false)
+          local string = v.name .. ' paid ' .. adjustment .. ' for ' .. v.count .. ' shares'
+          printToAll(string)
+        end
+
+        --pay the company
+        adjustment = math.ceil(dividend*(company_count/gameEntities[company].num_shares))
+        transferMoney('BANK', company, adjustment)
+        printToAll(company .. ' paid ' .. adjustment .. ' for ' .. company_count .. ' shares')
+
+        --pay other companies
+        if CROSS_INVESTED_SHARES_PAY then
+            for k,v in pairs(cross_invest_payouts) do
+              adjustment = math.ceil(dividend*(v.count/gameEntities[company].num_shares))
+              transferMoney('BANK', k, adjustment, false)
+              local string = v.name .. ' paid ' .. adjustment .. ' for ' .. v.count .. ' shares'
+              printToAll(string)
+            end
+        end
+
+        --print to notecard log
+        logTransaction(dividend, 'BANK', company .. ' Shares', false)
+
+    --error handling
+    elseif total_count < gameEntities[company].num_shares then
+      printToAll('payouts NOT made, ' .. company .. ' shares are in a deck, or are not completely in the IPO/Treasury/Player hands')
+    else
+      printToAll('payouts NOT made, there are more than ' .. gameEntities[company].num_shares .. ' shares of ' .. company .. '!')
+    end
+
+    updateCounter()
+end
+
+function onload(savedState)
+    newGameBoardObj = getObjectFromGUID(newGameBoard)
+    newGameBoardObj.createButton(button6)
+
+    for k,v in pairs(gameEntities) do
+        --print(k .. ' ' .. v.adjust .. ' ' .. v.company)
+        if v.adjust != '' and v.player == false then
+            obj = getObjectFromGUID(v.adjust)
+            obj.createButton(counterbuttonbank)
+            if v.minor == false then
+            	obj.createButton(payfullbuttonbank)
+            end
+            obj.createButton(witholdbuttonbank)
+        elseif v.adjust != '' and v.player then
+            obj = getObjectFromGUID(v.adjust)
+            obj.createButton(counterbuttonbank)
+        end
+    end
+
+    updateCounter()
+end
+
+function onSave()
+    local saveState = {
+        transactions = transactions,
+        gameEntities = gameEntities,
+    }
+    return JSON.encode(saveState)
+end
+
+function companyzoneupdate(zone,board,xadj,yadj,zadj)
+    local bposition = {0,0,0}
+    local zposition = {0,0,0}
+    local fposition = {0,0,0}
+    bposition = board.getPosition()
+    zposition = zone.getPosition()
+    fposition.x = bposition.x + xadj
+    fposition.y = zposition.y + yadj
+    fposition.z = bposition.z + zadj
+    return fposition
+end
+
+function updateCounter()
+    for i,entityName in pairs(gameEntities) do
+        local button_parameters = {}
+        button_parameters.click_function = 'printHello'
+        button_parameters.label = entityName.treasury
+        button_parameters.position = {0, 0.11, 0}
+        button_parameters.rotation = {0, 0, 0}
+        button_parameters.width = 0
+        button_parameters.height = 0
+        button_parameters.font_size = 700
+        getObjectFromGUID(entityName.counter).clearButtons()
+        getObjectFromGUID(entityName.counter).createButton(button_parameters)
+    end
+end
+
+function update()
+    --Make the scripting zone stick to the company charters
+    for i, v in pairs(gameEntities) do
+        if v.zone and v.board and v.zone != '' and v.board != '' then
+            local z = getObjectFromGUID(v.zone)
+            local b = getObjectFromGUID(v.board)
+            z.setPosition(companyzoneupdate(z,b,0,0,0))
+            local rotation = b.getRotation()
+            z.setRotation(rotation)
+        end
+    end
+end
+
+--ensures that stacks of shares maintain the same name
+function onObjectEnterContainer(container, enter_object)
+    if (container.tag=='Deck') then
+        local topCard = container.getObjects()[1].name
+        container.setName(topCard)
+    end
+end
