@@ -134,7 +134,7 @@ function transferMoney(from, to, amount, log)
     gameEntities[to].treasury = gameEntities[to].treasury + amount
     gameEntities[from].treasury = gameEntities[from].treasury - amount
 
-    updateCounter()
+    updateLabels()
     if log then
         logTransaction(amount, from, to, true)
     end
@@ -145,7 +145,7 @@ function Withold(amount, company)
     gameEntities['BANK'].treasury = gameEntities['BANK'].treasury - amount
     logTransaction(amount, 'BANK', company .. ' Tres', false)
     printToAll('***** ' .. company .. ' WITHOLDS ' .. amount .. ' *****')
-    updateCounter()
+    updateLabels()
 end
 
 function logTransaction(amount, source, target, print)
@@ -315,7 +315,7 @@ function Payout(dividend, company)
       printToAll('payouts NOT made, there are more than ' .. gameEntities[company].num_shares .. ' shares of ' .. company .. '!')
     end
 
-    updateCounter()
+    updateLabels()
 end
 
 function onload(savedState)
@@ -340,7 +340,7 @@ function onload(savedState)
         end
     end
 
-    updateCounter()
+    updateLabels()
 end
 
 function onSave()
@@ -363,10 +363,10 @@ function companyzoneupdate(zone,board,xadj,yadj,zadj)
     return fposition
 end
 
-function updateCounter()
+function updateLabels()
     for i,entityName in pairs(gameEntities) do
         local button_parameters = {}
-        button_parameters.click_function = 'printHello'
+        button_parameters.click_function = 'nilFunction'
         button_parameters.label = entityName.treasury
         button_parameters.position = {0, 0.11, 0}
         button_parameters.rotation = {0, 0, 0}
