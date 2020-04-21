@@ -1,400 +1,581 @@
---select options
-COMPANIES_CAN_CROSS_INVEST = true --Companies will have shares from other companies on their own charter, and the script should handle this.
-CROSS_INVESTED_SHARES_PAY = true --If, for some reason, your game allows companies to hold shares in other companies but those shares don't pay dividends.
+USE_SAVES = false --set this to false while editing your mod or things like company treasuries, etc. will persist
+                  --set this to true, use "save and play" from the modding menu, and then actually save your mod to enable saves (TTS is dumb).
 
-BANK_SIZE = 12000
+gameOptions = {
+    COMPANIES_CAN_WITHHOLD = true,
+    COMPANIES_CAN_HALF_PAY = true,
+    COMPANIES_CAN_FULL_PAY = true,
 
+    BANK_SIZE = 12000,
 
-gameEntities = {
-    ['SM'] = {
-        moneyLabelGUID = '69a516',
-        scriptingZoneGUID = '88654d',
-        charterGUID = '5c990f',
-        inputCounterGUID = '33f79c',
-        num_shares=10,
-        player = false,
-        minor = false,
-        charter = true,
-    },
-    ['S1'] = {
-        moneyLabelGUID = '2789eb',
-        inputCounterGUID = '2dc1ff',
-        player = true,
-    },
-    ['BANK'] = {
-        moneyLabelGUID = '0ba963',
-        treasury = 37860,
-        transactionLog = 'a796bf',
-        company = false
-    },
+    MONEY_SYMBOL = '$',
+    MONEY_SYMBOL_POSITION = 'front',
+
+    TRANSACTION_LOG_GUID = nil,
+
+    BANK_POOL_SHARES_PAY_COMPANY = false,
+    BANK_POOL_ZONE_GUID = nil,
+
+    IPO_SHARES_PAY_COMPANY = false,
+    IPO_ZONE_GUID = nil,
+
+    CHARTER_SHARES_PAY_COMPANY = false,
 }
 
-ipo_zone = '63a95f'
-bank_zone = '4ad93d'
+gameEntities = {
+    OTHER_ACTORS = {
+            --Do not change the word 'BANK'; the script expects it.
+            ['BANK'] = {
+                moneyLabelGUID = 'right-click->scripting->GUID copies it to your clipboard',
+            },
 
-------------------------------------------------------------------------
+    }, COMPANIES = {
+            ['Example Company'] = {
+                moneyLabelGUID = '1234',
+                inputCounterGUID = 'abcd',
+                charterGUID = 'wxyz',
+            },
 
+            ['Example Company2'] = {
+                moneyLabelGUID = '1234',
+                inputCounterGUID = 'abcd',
+                charterGUID = 'wxyz',
+            },
 
-transactions = nil
+            --- etc.
 
-counterbuttonbank = {}
-counterbuttonbank.click_function = 'buttonTransfer'
-counterbuttonbank.function_owner = nil
-counterbuttonbank.label = 'Bank Transfer'
-counterbuttonbank.position = {0,0.1,0.5}
-counterbuttonbank.rotation = {0,180,0}
-counterbuttonbank.width = 400
-counterbuttonbank.height = 100
-counterbuttonbank.font_size = 50
+    }, PLAYERS = {
+            ['Red'] = {
+                moneyLabelGUID = '1234',
+                inputCounterGUID = '5678',
+            },
 
-witholdbuttonbank = {}
-witholdbuttonbank.click_function = 'buttonWithold'
-witholdbuttonbank.function_owner = nil
-witholdbuttonbank.label = 'Withold'
-witholdbuttonbank.position = {1,0.1,0}
-witholdbuttonbank.rotation = {0,180,0}
-witholdbuttonbank.width = 400
-witholdbuttonbank.height = 100
-witholdbuttonbank.font_size = 50
+            ['White'] = {
+                moneyLabelGUID = '706099',
+                inputCounterGUID = 'dbc540',
+            },
 
-payfullbuttonbank = {}
-payfullbuttonbank.click_function = 'buttonPay'
-payfullbuttonbank.function_owner = nil
-payfullbuttonbank.label = 'Payout'
-payfullbuttonbank.position = {-1,0.1,0}
-payfullbuttonbank.rotation = {0,180,0}
-payfullbuttonbank.width = 400
-payfullbuttonbank.height = 100
-payfullbuttonbank.font_size = 50
-payfullbuttonbank.color = green
+            --- etc.
 
--- payhalfbuttonbank = {}
--- payhalfbuttonbank.click_function = 'buttonPayHalf'
--- payhalfbuttonbank.function_owner = nil
--- payhalfbuttonbank.label = 'Pay Half'
--- payhalfbuttonbank.position = {0,0.1, -0.5}
--- payhalfbuttonbank.rotation = {0,180,0}
--- payhalfbuttonbank.width = 400
--- payhalfbuttonbank.height = 100
--- payhalfbuttonbank.font_size = 50
--- payhalfbuttonbank.iconColor = green
+    }
+}
 
-function buttonWithold(object, color)
-    charterButtonHelper(object, color, 2)
+-----You probably shouldn't edit these unless you know what you're doing.
+    -----They can be overwritten by including the option in gameOptions.
+
+gameOptionDefaults = {
+    COMPANIES_CAN_WITHHOLD = true,
+    COMPANIES_CAN_HALF_PAY = true,
+    COMPANIES_CAN_FULL_PAY = true,
+    HALF_PAY_ROUND = 10,
+    BANK_SIZE = nil,
+    TRANSACTION_LOG_GUID = nil,
+    MONEY_SYMBOL = nil,
+    MONEY_SYMBOL_POSITION = nil,
+    BANK_POOL_SHARES_PAY_COMPANY = false,
+    BANK_POOL_ZONE_GUID = nil,
+    IPO_SHARES_PAY_COMPANY = false,
+    IPO_ZONE_GUID = nil,
+    CHARTER_SHARES_PAY_COMPANY = false,
+    COMPANIES_CAN_CROSS_INVEST = false,
+}
+
+-----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
+function onSave()
+    saved_data = JSON.encode(gameEntities)
+    if not USE_SAVES then saved_data = '' end
+    return saved_data
 end
 
-function buttonPay(object, color)
-    charterButtonHelper(object, color, 1)
+function onload(saved_data)
+    if saved_data~='' then
+        broadcastToAll('Loading from a save')
+        gameEntities = JSON.decode(saved_data)
+    end
+    initCompanies()
+    initPlayers()
+    initBank()
+    initLog()
+    initIPO()
+    initBankPool()
 end
 
--- function buttonPayHalf(object, color)
---     charterButtonHelper(object, color, 3)
--- end
+function initCompanies()
+    for k,company in pairs(gameEntities.COMPANIES) do
+        --error checking
+        if not company.moneyLabelGUID then
+            broadcastToAll('ERROR: No "moneyLabelGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(company.moneyLabelGUID) then
+            broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s moneyLabelGUID.', ERROR_COLOR) return
+        end
+        if not company.inputCounterGUID then
+            broadcastToAll('ERROR: No "inputCounterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(company.inputCounterGUID) then
+            broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s inputCounterGUID.', ERROR_COLOR) return
+        end
+        if not company.charterGUID then
+            broadcastToAll('ERROR: No "charterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(company.charterGUID) then
+            broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s charterGUID.', ERROR_COLOR) return
+        end
 
-function buttonTransfer(object, color)
-    charterButtonHelper(object, color, 0)
+        --Copy over or override global options
+        for j,v in pairs(gameOptionDefaults) do
+            if company[j]==nil then
+                if gameOptions[j]==nil then
+                    company[j] = v
+                else
+                    company[j] = gameOptions[j]
+                end
+            end
+        end
+
+        company.key = k
+        if not company.name then company.name = k end
+        if not company.shareDescription then company.shareDescription = k end
+        if not company.issueSize then company.issueSize = 10 end
+        if not company.treasury then company.treasury = 0 end
+        updateLabel(company)
+
+        --fucking LUA wizardry
+        --Using a locally defined function as the click_function allows us to access the other local variables in this for loop
+        local bTParam = bankTransferParams
+        local wParam = withholdParams
+        local pFParam = payFullParams
+        local pHParam = payHalfParams
+
+        if company.COMPANIES_CAN_HALF_PAY then
+            local payFuncName = k .. 'PayHalf'
+            local payFunc = function(object, color) buttonHelper(company, 'PayHalf') end
+            Global.setVar(payFuncName, payFunc)
+            pHParam.click_function = payFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(pHParam)
+        end
+
+        if company.COMPANIES_CAN_FULL_PAY then
+            local payFuncName = k .. 'Payout'
+            local payFunc = function(object, color) buttonHelper(company, 'Payout') end
+            Global.setVar(payFuncName, payFunc)
+            pFParam.click_function = payFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(pFParam)
+        end
+
+        if company.COMPANIES_CAN_HALF_PAY and company.COMPANIES_CAN_FULL_PAY then
+            getObjectFromGUID(company.inputCounterGUID).editButton({index=0, position = addv(pHParam.position,{0,0,-0.2})})
+            getObjectFromGUID(company.inputCounterGUID).editButton({index=1, label='Pay Full', position = addv(pFParam.position,{0,0,0.2})})
+        end
+
+        local bankFuncName = k .. 'bankTransfer'
+        local bankFunc = function(object, color) buttonHelper(company, 'Bank Transfer') end
+        Global.setVar(bankFuncName, bankFunc)
+        bTParam.click_function = bankFuncName
+        getObjectFromGUID(company.inputCounterGUID).createButton(bTParam)
+
+        if company.COMPANIES_CAN_WITHHOLD then
+            local withholdFuncName = k .. 'withholdTransfer'
+            local withholdFunc = function(object, color) buttonHelper(company, 'Withhold') end
+            Global.setVar(withholdFuncName, withholdFunc)
+            wParam.click_function = withholdFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(wParam)
+        end
+    end
 end
 
-function charterButtonHelper(object, color, type)
+function initPlayers()
+    for k,player in pairs(gameEntities.PLAYERS) do
+        --error checking
+        if not player.moneyLabelGUID then
+            broadcastToAll('ERROR: No "moneyLabelGUID" entry was found for the ' .. k .. ' Player', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(player.moneyLabelGUID) then
+            broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Player\'s moneyLabelGUID.', ERROR_COLOR) return
+        end
+        if not player.inputCounterGUID then
+            broadcastToAll('ERROR: No "inputCounterGUID" entry was found for the ' .. k .. ' Player', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(player.inputCounterGUID) then
+            broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Player\'s inputCounterGUID.', ERROR_COLOR) return
+        end
+        if player.shareZoneGUID then
+            if not getObjectFromGUID(player.shareZoneGUID) then
+                broadcastToAll('ERROR: shareZoneGUID is set and an object could not be found for the ' .. k .. ' Player\'s shareZoneGUID.', ERROR_COLOR) return
+            end
+            player.shareZone = getObjectFromGUID(player.shareZoneGUID)
+        end
 
-    local amount = object.getValue()
-    local key = object.getGMNotes()
+        --okay
+        player.key = k
+        if Player[k].seated then player.name = Player[k].steam_name else player.name = k end
+        if not player.treasury then player.treasury = 0 end
+        updateLabel(player)
 
-    if type == 0 then
-        transferMoney(key, 'BANK', amount, true)
-    elseif type == 1 then
-        Payout(amount, key)
-    elseif type == 2 then
-        Withold(amount, key)
-    elseif type == 3 then
-        Payout(amount/2, key)
-        Withold(amount/2, key)
+        --Using a locally defined function as the click_function allows us to access the other local variables in this for loop
+        local bankFuncName = k .. 'bankTransfer'
+        local bankFunc = function(object, color) buttonHelper(player, 'Bank Transfer') end
+        Global.setVar(bankFuncName, bankFunc)
+        bankTransferParams.click_function = bankFuncName
+        getObjectFromGUID(player.inputCounterGUID).createButton(bankTransferParams)
+    end
+end
+
+function initIPO()
+    --if global or any company has IPO_SHARES_PAY_COMPANY, enforce a GUID and fetch bank pool zone
+    local usingIPO = gameOptions.IPO_SHARES_PAY_COMPANY
+    for k,v in pairs(gameEntities.COMPANIES) do
+        usingIPO = usingIPO or v.IPO_SHARES_PAY_COMPANY
     end
 
-end
+    --if using IPO, check to see if the GUID is set.
+    if usingIPO then
+        if not (gameOptions.IPO_ZONE_GUID) then
+            broadcastToAll('IPO_SHARES_PAY_COMPANY is set for at least one company but could not find IPO_ZONE_GUID in gameOptions', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(gameOptions.IPO_ZONE_GUID) then
+            broadcastToAll('ERROR: IPO_ZONE_GUID does not match anything in this mod.', ERROR_COLOR) return
+        end
 
-function getPlayerId(color)
-    if color == 'Red' then return 'S1'
-    elseif color == 'Brown' then return 'S2'
-    elseif color == 'White' then return 'S3'
-    elseif color == 'Green' then return 'S4'
-    elseif color == 'Blue' then return 'S5'
+        --error free
+        IPO_ZONE = getObjectFromGUID(gameOptions.IPO_ZONE_GUID)
     end
 end
 
-function assignTreasury(playerList, amount)
-    for i=1, #playerList, 1 do
-        gameEntities[playerList[i]].treasury = amount
+function initBankPool()
+    --if global or any company has IPO_SHARES_PAY_COMPANY, enforce a GUID and fetch bank pool zone
+    local usingBankPool = gameOptions.BANK_POOL_SHARES_PAY_COMPANY
+    for k,v in pairs(gameEntities.COMPANIES) do
+        usingBankPool = usingBankPool or v.BANK_POOL_SHARES_PAY_COMPANY
+    end
+
+    --if using IPO, check to see if the GUID is set.
+    if usingBankPool then
+        if not (gameOptions.BANK_POOL_ZONE_GUID) then
+            broadcastToAll('BANK_POOL_SHARES_PAY_COMPANY is set for at least one company but could not find BANK_POOL_ZONE_GUID in gameOptions', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUID) then
+            broadcastToAll('ERROR: BANK_POOL_ZONE_GUID does not match anything in this mod.', ERROR_COLOR) return
+        end
+
+        --error free
+        BANK_POOL_ZONE = getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUID)
     end
 end
 
-function transferMoney(from, to, amount, log)
-        fromCounter = getObjectFromGUID(gameEntities[from].moneyLabelGUID)
-    toCounter = getObjectFromGUID(gameEntities[to].moneyLabelGUID)
-    gameEntities[to].treasury = gameEntities[to].treasury + amount
-    gameEntities[from].treasury = gameEntities[from].treasury - amount
+function initBank()
+    --Check if there should be a bank.
+    USE_BANK = gameOptions.BANK_SIZE
+    if USE_BANK and not gameEntities.OTHER_ACTORS['BANK'] then broadcastToAll('ERROR: Bank size is non-zero but no "BANK" entry was found in gameEntities.OTHER_ACTORS', ERROR_COLOR) return end
 
-    updateLabels()
-    if log then
-        logTransaction(amount, from, to, true)
+    if USE_BANK then
+        --error checking
+        if not gameEntities.OTHER_ACTORS['BANK'].moneyLabelGUID then
+            broadcastToAll('ERROR: No "moneyLabelGUID" entry was found in gameEntities.OTHER_ACTORS[\'BANK\'].', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(gameEntities.OTHER_ACTORS['BANK'].moneyLabelGUID) then
+            broadcastToAll('ERROR: An object could not be found for the bank\'s moneyLabelGUID.', ERROR_COLOR) return
+        end
+
+        --Okay
+        if not gameEntities.OTHER_ACTORS['BANK'].treasury then gameEntities.OTHER_ACTORS['BANK'].treasury = gameOptions.BANK_SIZE end
+        updateLabel(gameEntities.OTHER_ACTORS['BANK'])
     end
 end
 
-function Withold(amount, company)
-    gameEntities[company].treasury = gameEntities[company].treasury + amount
-    gameEntities['BANK'].treasury = gameEntities['BANK'].treasury - amount
-    logTransaction(amount, 'BANK', company .. ' Tres', false)
-    printToAll('***** ' .. company .. ' WITHOLDS ' .. amount .. ' *****')
-    updateLabels()
+function initLog()
+    if gameOptions.TRANSACTION_LOG_GUID then
+        --error checking
+        if not getObjectFromGUID(gameOptions.TRANSACTION_LOG_GUID) then
+            broadcastToAll('ERROR: TRANSACTION_LOG_GUID was set but an object with that GUID could not be found.', ERROR_COLOR) return
+        end
+
+        --Okay
+        TRANSACTION_LOG = getObjectFromGUID(gameOptions.TRANSACTION_LOG_GUID)
+        TRANSACTION_LOG.setName('Transaction Log')
+        TRANSACTION_LOG.setDescription('')
+
+        TRANSACTIONS = nil
+    end
 end
 
-function logTransaction(amount, source, target, print)
-    local str = os.date("%H:%M - ") .. 'Transferred ' .. amount .. ' from ' .. source .. ' to ' .. target
+function buttonHelper(caller, type)
+    local amount = getObjectFromGUID(caller.inputCounterGUID).getValue()
+    if amount == 0 then return end
+    printToAll('') --newline
+    if type == 'Bank Transfer' then
+        transferMoneyWithBank(caller, amount, true, true)
+    elseif type == 'Payout' then
+        Payout(caller, amount)
+    elseif type == 'Withhold' then
+        Withhold(caller, amount)
+    elseif type == 'PayHalf' then
+        Payout(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, true))
+        Withhold(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, false))
+    end
+end
+
+function transferMoneyWithBank(caller, amount, print, log)
+    --print = boolean, print to all chat?
+    --log = boolean, print to the log object?
+    caller.treasury = caller.treasury + amount
+    updateLabel(caller)
+    if USE_BANK then
+        gameEntities.OTHER_ACTORS['BANK'].treasury = gameEntities.OTHER_ACTORS['BANK'].treasury - amount
+        updateLabel(gameEntities.OTHER_ACTORS['BANK'])
+    end
+    if (amount > 0) then
+        logTransaction(amount, 'Bank', caller.name, print, log)
+    elseif (amount < 0) then
+        logTransaction(amount*-1, caller.name, 'Bank', print, log)
+    end
+end
+
+function Withhold(caller, amount)
+    transferMoneyWithBank(caller, amount, false, true)
+    printToAll('*** ' .. caller.name .. ' WITHOLDS ' .. formatLabel(amount) .. ' ***')
+end
+
+function Payout(caller, amount)
+    local payoutTable = {}
+    --Part of this function spawns ScriptingZones, which take more than one frame to load.
+    --The waitFlags are used to make sure all ScriptingZones have loaded and done their thing before continuing.
+    local waitFlags = {}
+
+    --tabulate player shares
+    for k,v in pairs(gameEntities.PLAYERS) do
+        payoutTable[k] = {v, 0}
+        --if player has a designated zone, search that for shares matching this company
+        if v.shareZone then
+            payoutTable[k][2] = searchContainer(v.shareZone.getObjects(), caller, payoutTable[k][2])
+        end
+        --search the player's hand
+        payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
+    end
+
+    --tabulate company shares
+        payoutTable[caller.key] = {caller, 0}
+        --bank pool
+        if caller.BANK_POOL_SHARES_PAY_COMPANY then
+            payoutTable[caller.key][2] = searchContainer(BANK_POOL_ZONE.getObjects(), caller, payoutTable[caller.key][2])
+        end
+        --IPO
+        if caller.IPO_SHARES_PAY_COMPANY then
+            payoutTable[caller.key][2] = searchContainer(IPO_ZONE.getObjects(), caller, payoutTable[caller.key][2])
+        end
+        --Charter
+        if caller.CHARTER_SHARES_PAY_COMPANY then
+            waitFlags[caller.key] = false
+
+            --Dynamically spawn a scripting zone to on the charter
+            local bb = getObjectFromGUID(caller.charterGUID).getBoundsNormalized()
+            local params = {}
+            local callbackName = "callback" .. caller.key
+            params.position = getObjectFromGUID(caller.charterGUID).getPosition()
+            params.rotation = getObjectFromGUID(caller.charterGUID).getRotation()
+            params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
+            params.callback = callbackName
+            params.type = 'ScriptingTrigger'
+            params.sound = false
+            local zone = spawnObject(params)
+
+            local callbackFunc = function()
+                payoutTable[caller.key][2] = searchContainer(zone.getObjects(), caller, payoutTable[caller.key][2])
+                waitFlags[caller.key] = true
+                zone.destruct()
+            end
+            Global.setVar(callbackName, callbackFunc)
+        end
+
+    --tabulate shares on other companies
+    if caller.COMPANIES_CAN_CROSS_INVEST then
+
+        for k,v in pairs(gameEntities.COMPANIES) do
+            if k~=caller.key then
+                payoutTable[k] = {v,0}
+                waitFlags[k] = false
+
+                --Dynamically spawn a scripting zone to on the charter
+                local bb = getObjectFromGUID(v.charterGUID).getBoundsNormalized()
+                local params = {}
+                local callbackName = "callback" .. k
+                params.position = getObjectFromGUID(v.charterGUID).getPosition()
+                params.rotation = getObjectFromGUID(v.charterGUID).getRotation()
+                params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
+                params.callback = callbackName
+                params.type = 'ScriptingTrigger'
+                params.sound = false
+                local zone = spawnObject(params)
+
+                local callbackFunc = function()
+                    payoutTable[k][2] = searchContainer(zone.getObjects(), caller, payoutTable[k][2])
+                    waitFlags[k] = true
+                    zone.destruct()
+                end
+                Global.setVar(callbackName, callbackFunc)
+            end
+        end
+
+    end
+        Wait.condition(
+        function()
+            transferPayouts(caller, payoutTable, amount)
+        end,
+        function()
+            local temp = true
+            for k,v in pairs(waitFlags) do
+                temp = temp and v
+            end
+            return temp
+        end)
+end
+
+function transferPayouts(caller, payoutTable, amount)
+    printToAll("--- " .. caller.name .. " pays out " .. formatLabel(amount) .. " ---")
+    logTransaction(amount, 'Bank', caller.name .. ' Shares', false, true)
+    for k,v in pairs(payoutTable) do
+        if (v[2]>0) then
+            local calc = math.ceil(amount*v[2]/caller.issueSize)
+            transferMoneyWithBank(v[1], calc, false, false)
+            local string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
+            printToAll(string)
+        end
+    end
+end
+
+function searchContainer(container, caller, count)
+    --this only works if container is a literal list of object values
+    for i,o in ipairs(container) do
+        if o.getQuantity() == -1 then
+            --object is a singleton
+            count = addShare(o.getDescription(),caller,count)
+        else
+            --object is a deck
+            for j,k in ipairs(o.getObjects()) do
+                count = addShare(k.description,caller,count)
+            end
+        end
+    end
+    return count
+end
+
+function addShare(description, caller, count)
+    --if description includes the caller's expected description then add to num
+    if (string.find(description, caller.shareDescription)) then
+        return count + tonumber(string.sub(description, 1+#caller.shareDescription))
+    else
+        return count
+    end
+end
+
+---MISC. HELPER FUNCTIONS---
+
+function logTransaction(amount, source, target, print, log)
+    local str = os.date("%H:%M - ") .. 'Transferred ' .. formatLabel(amount) .. ' from ' .. source .. ' to ' .. target
     if print then
         printToAll(str)
     end
-    transactions = { next = transactions, value = str }
-    local t = transactions
-    local item = 0
-    local transactionLog = ''
-    while t and item < 10 do
-        transactionLog = transactionLog .. t.value .. '\n'
-        item = item + 1
-        t = t.next
+
+    if TRANSACTION_LOG and log then
+        --nested tables?
+        TRANSACTIONS = { next = TRANSACTIONS, value = str }
+        local t = TRANSACTIONS
+        local item = 0
+        local transactionLog = ''
+        while t and item < 9 do
+            transactionLog = transactionLog .. t.value .. '\n'
+            item = item + 1
+            t = t.next
+        end
+        TRANSACTION_LOG.setDescription(transactionLog)
     end
-    getObjectFromGUID(gameEntities['BANK'].transactionLog).setDescription(transactionLog)
 end
 
-function Payout(dividend, company)
-    --tabulate shares in the players' hands
-    local objectPile
-    playerList = Player.getPlayers()
-    local total_count = 0
-    local quantity = 0
-    local player_payouts = {}
-    for i,player in ipairs(playerList) do
-        count = 0
-        objectPile = player.getHandObjects()
-        for i,v in pairs(objectPile) do
-            local name = objectPile[i].getName()
-            if name == company then
-                count = count + 1
-            elseif name == company .. 'P2' then
-                count = count + 2
+function updateLabel(table_entry)
+    local button_parameters = {}
+    button_parameters.click_function = 'nilFunction'
+    button_parameters.label = formatLabel(table_entry.treasury)
+    button_parameters.position = {0, 0.11, 0}
+    button_parameters.rotation = {0, 180, 0}
+    button_parameters.width = 0
+    button_parameters.height = 0
+    button_parameters.font_size = 700
+    getObjectFromGUID(table_entry.moneyLabelGUID).clearButtons()
+    getObjectFromGUID(table_entry.moneyLabelGUID).createButton(button_parameters)
+end
 
-            end
-        end
-        total_count = total_count + count
-        if count > 0 then
-            player_payouts[player.color] = { count = count, name = player.steam_name }
+function formatLabel(number)
+    local newLabel = format_int(number)
+    if gameOptions.MONEY_SYMBOL then
+        if gameOptions.MONEY_SYMBOL_POSITION == 'end' then
+            newLabel = newLabel .. gameOptions.MONEY_SYMBOL
+        else
+            newLabel = gameOptions.MONEY_SYMBOL .. newLabel
         end
     end
+    return newLabel
+end
 
-    --tabulate shares on the company charter
-    local company_obj_pile
-    company_obj_pile = getObjectFromGUID(gameEntities[company].scriptingZoneGUID).getObjects()
-    count = 0
-    company_count = 0
-    for i,v in pairs(company_obj_pile) do
-        name = v.getName()
-        quantity = v.getQuantity()
-        if name == company then
-            if quantity == -1 then
-                count = count + 1
-            else
-                count = count + quantity
-            end
-        end
-    end
-    company_count = count
-    total_count = total_count + count
+function format_int(number)
+  local i, j, minus, int, fraction = tostring(number):find('([-]?)(%d+)([.]?%d*)')
+  -- reverse the int-string and append a comma to all blocks of 3 digits
+  int = int:reverse():gsub("(%d%d%d)", "%1,")
+  -- reverse the int-string back remove an optional comma and put the
+  -- optional minus and fractional part back
+  return minus .. int:reverse():gsub("^,", "") .. fraction
+end
 
-    --If companies can buy shares in other companies, tabulate shares on charters other than the acting company.
-    local cross_invest_payouts = {}
-    if COMPANIES_CAN_CROSS_INVEST then
-        local objectPile
-        for k,otherCompany in pairs(gameEntities) do
-            --check to see if this is a company and that it's not this company
-            if (otherCompany.charter and k~=company) then
-                count = 0
-                objectPile = getObjectFromGUID(gameEntities[k].scriptingZoneGUID).getObjects()
-                for i,v in pairs(objectPile) do
-                    name = v.getName()
-                    quantity = v.getQuantity()
-                    if name == company then
-                        if quantity == -1 then
-                            count = count + 1
-                        else
-                            count = count + quantity
-                        end
-                    end
-                end
-                total_count = total_count + count
-                if count > 0 then
-                    cross_invest_payouts[k] = {count=count, name=k}
-                end
-            end
-        end
-    end
+function addv(v1, v2)
+    --add vectors
+    return {v1[1]+v2[1], v1[2]+v2[2], v1[3]+v2[3]}
+end
 
-    --tabluate shares in the zone labeled IPO
-    count = 0
-    local ipo_objs
-    ipo_objs = getObjectFromGUID(ipo_zone).getObjects()
-    for i,v in pairs(ipo_objs) do
-        name = v.getName()
-        quantity = v.getQuantity()
-        if name == company then
-            if quantity == -1 then
-                count = count + 1
-            else
-                count = count + quantity
-            end
-
-        elseif name == company .. 'P' then
-            count = count + 2
-        end
-    end
-    total_count = total_count + count
-
-    --tabulate shares in the zone labeled bank pool
-    count = 0
-    local ipo_objs
-    ipo_objs = getObjectFromGUID(bank_zone).getObjects()
-    for i,v in pairs(ipo_objs) do
-        name = v.getName()
-        quantity = v.getQuantity()
-        if name == company then
-            if quantity == -1 then
-                count = count + 1
-            else
-                count = count + quantity
-            end
-
-        elseif name == company .. 'P' then
-            count = count + 2
-        end
-    end
-    total_count = total_count + count
-
-    --print(total_count)
-    --print(gameEntities[company].num_shares)
-    if total_count==gameEntities[company].num_shares then
-        printToAll("------ " .. company .. " pays " .. dividend .. " ------")
-
-        --pay the players
-        for k,v in pairs(player_payouts) do
-          adjustment = math.ceil(dividend*(v.count/gameEntities[company].num_shares))
-          transferMoney('BANK', getPlayerId(k), adjustment, false)
-          local string = v.name .. ' paid ' .. adjustment .. ' for ' .. v.count .. ' shares'
-          printToAll(string)
-        end
-
-        --pay the company
-        adjustment = math.ceil(dividend*(company_count/gameEntities[company].num_shares))
-        transferMoney('BANK', company, adjustment)
-        printToAll(company .. ' paid ' .. adjustment .. ' for ' .. company_count .. ' shares')
-
-        --pay other companies
-        if CROSS_INVESTED_SHARES_PAY then
-            for k,v in pairs(cross_invest_payouts) do
-              adjustment = math.ceil(dividend*(v.count/gameEntities[company].num_shares))
-              transferMoney('BANK', k, adjustment, false)
-              local string = v.name .. ' paid ' .. adjustment .. ' for ' .. v.count .. ' shares'
-              printToAll(string)
-            end
-        end
-
-        --print to notecard log
-        logTransaction(dividend, 'BANK', company .. ' Shares', false)
-
-    --error handling
-    elseif total_count < gameEntities[company].num_shares then
-      printToAll('payouts NOT made, ' .. company .. ' shares are in a deck, or are not completely in the IPO/Treasury/Player hands')
+function roundTo(input, roundAmount, upDown)
+    --returns input rounded to roundAmount
+    --if upDown = true, round up, else round down
+    if upDown then
+        return math.ceil(input / roundAmount) * roundAmount
     else
-      printToAll('payouts NOT made, there are more than ' .. gameEntities[company].num_shares .. ' shares of ' .. company .. '!')
-    end
-
-    updateLabels()
-end
-
-function onload(savedState)
-    for k,v in pairs(gameEntities) do
-
-        --default treasuries
-        if v.treasury == nil then v.treasury=0 end
-
-        --Give each inputCounter a tag linking it to its key
-        if v.inputCounterGUID then getObjectFromGUID(v.inputCounterGUID).setGMNotes(k) end
-
-        if v.inputCounterGUID != '' and v.player == false then
-            obj = getObjectFromGUID(v.inputCounterGUID)
-            obj.createButton(counterbuttonbank)
-            if v.minor == false then
-            	obj.createButton(payfullbuttonbank)
-            end
-            obj.createButton(witholdbuttonbank)
-        elseif v.inputCounterGUID != '' and v.player then
-            obj = getObjectFromGUID(v.inputCounterGUID)
-            obj.createButton(counterbuttonbank)
-        end
-    end
-
-    updateLabels()
-end
-
-function onSave()
-    local saveState = {
-        transactions = transactions,
-        gameEntities = gameEntities,
-    }
-    return JSON.encode(saveState)
-end
-
-function companyzoneupdate(zone,board,xadj,yadj,zadj)
-    local bposition = {0,0,0}
-    local zposition = {0,0,0}
-    local fposition = {0,0,0}
-    bposition = board.getPosition()
-    zposition = zone.getPosition()
-    fposition.x = bposition.x + xadj
-    fposition.y = zposition.y + yadj
-    fposition.z = bposition.z + zadj
-    return fposition
-end
-
-function updateLabels()
-    for i,entityName in pairs(gameEntities) do
-        local button_parameters = {}
-        button_parameters.click_function = 'nilFunction'
-        button_parameters.label = entityName.treasury
-        button_parameters.position = {0, 0.11, 0}
-        button_parameters.rotation = {0, 0, 0}
-        button_parameters.width = 0
-        button_parameters.height = 0
-        button_parameters.font_size = 700
-        getObjectFromGUID(entityName.moneyLabelGUID).clearButtons()
-        getObjectFromGUID(entityName.moneyLabelGUID).createButton(button_parameters)
+        return math.floor(input / roundAmount) * roundAmount
     end
 end
 
-function update()
-    --Make the scripting zone stick to the company charters
-    for i, v in pairs(gameEntities) do
-        if v.scriptingZoneGUID and v.charterGUID and v.scriptingZoneGUID != '' and v.charterGUID != '' then
-            local z = getObjectFromGUID(v.scriptingZoneGUID)
-            local b = getObjectFromGUID(v.charterGUID)
-            z.setPosition(companyzoneupdate(z,b,0,0,0))
-            local rotation = b.getRotation()
-            z.setRotation(rotation)
-        end
-    end
+function onPlayerChangeColor(color)
+    if gameEntities.PLAYERS[color] then gameEntities.PLAYERS[color].name = Player[color].steam_name end
 end
 
---ensures that stacks of shares maintain the same name
-function onObjectEnterContainer(container, enter_object)
-    if (container.tag=='Deck') then
-        local topCard = container.getObjects()[1].name
-        container.setName(topCard)
-    end
-end
+---Hardcoded values---
+
+ERROR_COLOR = {r=1, g=0, b=0}
+
+bankTransferParams = {}
+bankTransferParams.label = 'Bank Transfer'
+bankTransferParams.position = {0,0.1,0.5}
+bankTransferParams.rotation = {0,180,0}
+bankTransferParams.width = 400
+bankTransferParams.height = 100
+bankTransferParams.font_size = 50
+
+withholdParams = {}
+withholdParams.label = 'Withhold'
+withholdParams.position = {1,0.1,0}
+withholdParams.rotation = {0,180,0}
+withholdParams.width = 400
+withholdParams.height = 100
+withholdParams.font_size = 50
+
+payFullParams = {}
+payFullParams.label = 'Payout'
+payFullParams.position = {-1,0.1,0}
+payFullParams.rotation = {0,180,0}
+payFullParams.width = 400
+payFullParams.height = 100
+payFullParams.font_size = 50
+
+payHalfParams = {}
+payHalfParams.label = 'Pay Half'
+payHalfParams.position = {-1,0.1, 0}
+payHalfParams.rotation = {0,180,0}
+payHalfParams.width = 400
+payHalfParams.height = 100
+payHalfParams.font_size = 50
