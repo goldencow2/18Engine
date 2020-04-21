@@ -555,6 +555,7 @@ bankTransferParams.rotation = {0,180,0}
 bankTransferParams.width = 400
 bankTransferParams.height = 100
 bankTransferParams.font_size = 50
+bankTransferParams.tooltip = 'Input a positive number in your counter to receive money. Input a negative number to spend money.'
 
 withholdParams = {}
 withholdParams.label = 'Withhold'
