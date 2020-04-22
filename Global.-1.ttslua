@@ -1,5 +1,5 @@
 USE_SAVES = false --set this to false while editing your mod or things like company treasuries, etc. will persist
-                  --set this to true, use "save and play" from the modding menu, and then actually save your mod to enable saves (TTS is dumb).
+                  --set this to true, copy in the script, use "save and play" from the modding menu, and then actually save your mod to enable saves (TTS is dumb).
 
 gameOptions = {
     COMPANIES_CAN_WITHHOLD = true,
@@ -89,7 +89,6 @@ end
 
 function onload(saved_data)
     if saved_data~='' then
-        broadcastToAll('Loading from a save')
         gameEntities = JSON.decode(saved_data)
     end
     initCompanies()
