@@ -28,6 +28,13 @@ gameOptions = {
     CHARTER_SHARES_PAY_COMPANY = false,
     --If this option is set to true, you'll need to provide the GUID of each of your company's charters in their table entry below.
     --I mean you have to right now anyway, but in a future update it will be optional unless some other option requires it.
+
+    --By default, shares (and privates, if enabled) in a player's hand pay that player.
+
+    USE_PRIVATES = true, --All privates should be given the description Private#, where # is the payout amount.
+    --The script does not automatically handle a private whose payout changes during the game.
+    --However, if you use TTS's States feature you can combine two or more objects into one and give each one a different description.
+    --Changing the private's state would then automatically change its payout.
 }
 
 gameEntities = {
@@ -35,6 +42,9 @@ gameEntities = {
             --Do not change the word 'BANK'; the script expects it.
             ['BANK'] = {
                 moneyLabelGUID = 'right-click->scripting->GUID copies it to your clipboard',
+            },
+            ['PRIVATES'] = {
+                payPrivatesButtonGUID = 'This value and the bank\'s GUID value only need to be set if using the corresponding options'
             },
 
     }, COMPANIES = {
@@ -70,12 +80,11 @@ gameEntities = {
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
-
 gameOptionDefaults = {
     COMPANIES_CAN_WITHHOLD = true,
     COMPANIES_CAN_HALF_PAY = false,
     COMPANIES_CAN_FULL_PAY = true,
-    HALF_PAY_ROUND = 10,
+    HALF_PAY_ROUND = 10, --Round the payout of a half-pay to the nearest multiple of this, in favor of the players.
     BANK_SIZE = nil,
     TRANSACTION_LOG_GUID = nil,
     MONEY_SYMBOL = nil,
@@ -85,7 +94,10 @@ gameOptionDefaults = {
     IPO_SHARES_PAY_COMPANY = false,
     IPO_ZONE_GUID = nil,
     CHARTER_SHARES_PAY_COMPANY = false,
-    COMPANIES_CAN_CROSS_INVEST = false,
+    COMPANIES_CAN_CROSS_INVEST = false, --Companies can own shares in other companies (the script will pay foreign shares on charters)
+    SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false, --The number appended to a share's description is the % of the revenue it will receive e.g 'B&O20' = 20%, 'UdW5' = 5%
+    USE_PRIVATES = false; --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
+    COMPANIES_CAN_OWN_PRIVATES = true; --if set to false, the script won't ask you to supply charter GUIDs (Note: not implemented yet)
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
@@ -102,6 +114,7 @@ function onload(saved_data)
     initCompanies()
     initPlayers()
     initBank()
+    initPrivates()
     initLog()
     initIPO()
     initBankPool()
@@ -250,13 +263,13 @@ function initIPO()
 end
 
 function initBankPool()
-    --if global or any company has IPO_SHARES_PAY_COMPANY, enforce a GUID and fetch bank pool zone
+    --if global or any company has BANK_SHARES_PAY_COMPANY, enforce a GUID and fetch bank pool zone
     local usingBankPool = gameOptions.BANK_POOL_SHARES_PAY_COMPANY
     for k,v in pairs(gameEntities.COMPANIES) do
         usingBankPool = usingBankPool or v.BANK_POOL_SHARES_PAY_COMPANY
     end
 
-    --if using IPO, check to see if the GUID is set.
+    --if using bank pool, check to see if the GUID is set.
     if usingBankPool then
         if not (gameOptions.BANK_POOL_ZONE_GUID) then
             broadcastToAll('BANK_POOL_SHARES_PAY_COMPANY is set for at least one company but could not find BANK_POOL_ZONE_GUID in gameOptions', ERROR_COLOR) return
@@ -287,6 +300,23 @@ function initBank()
         --Okay
         if not gameEntities.OTHER_ACTORS['BANK'].treasury then gameEntities.OTHER_ACTORS['BANK'].treasury = gameOptions.BANK_SIZE end
         updateLabel(gameEntities.OTHER_ACTORS['BANK'])
+    end
+end
+
+function initPrivates()
+    if gameOptions.USE_PRIVATES and not gameEntities.OTHER_ACTORS['PRIVATES'] then broadcastToAll('ERROR: USE_PRIVATES is set but no "PRIVATES" entry was found in gameEntities.OTHER_ACTORS', ERROR_COLOR) return end
+
+    if gameOptions.USE_PRIVATES then
+        --error checking
+        if not gameEntities.OTHER_ACTORS['PRIVATES'].payPrivatesButtonGUID then
+            broadcastToAll('ERROR: No "payPrivatesButtonGUID" entry was found in gameEntities.OTHER_ACTORS[\'PRIVATES\'].', ERROR_COLOR) return
+        end
+        if not getObjectFromGUID(gameEntities.OTHER_ACTORS['PRIVATES'].payPrivatesButtonGUID) then
+            broadcastToAll('ERROR: An object could not be found for the privatess\' payPrivatesButtonGUID.', ERROR_COLOR) return
+        end
+
+        --Okay
+        getObjectFromGUID(gameEntities.OTHER_ACTORS['PRIVATES'].payPrivatesButtonGUID).createButton(payPrivatesParams)
     end
 end
 
@@ -442,10 +472,87 @@ function transferPayouts(caller, payoutTable, amount)
     logTransaction(amount, 'Bank', caller.name .. ' Shares', false, true)
     for k,v in pairs(payoutTable) do
         if (v[2]>0) then
-            local calc = math.ceil(amount*v[2]/caller.issueSize)
+            local calc = 0
+            local string = ''
+            if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
+                calc = math.ceil(amount*v[2]/100)
+                string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. '%.'
+            else
+                calc = math.ceil(amount*v[2]/caller.issueSize)
+                string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
+            end
             transferMoneyWithBank(v[1], calc, false, false)
-            local string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
             printToAll(string)
+        end
+    end
+end
+
+function payPrivates()
+    local fakeCaller = {} --hacky shit so I can use the share search function on privates
+    fakeCaller.shareDescription = 'Private'
+
+    local payoutTable = {}
+    --Part of this function spawns ScriptingZones, which take more than one frame to load.
+    --The waitFlags are used to make sure all ScriptingZones have loaded and done their thing before continuing.
+    local waitFlags = {}
+
+    --tabulate player privates
+    for k,v in pairs(gameEntities.PLAYERS) do
+        payoutTable[k] = {v, 0}
+        --if player has a designated zone, search that for shares matching this company
+        if v.shareZone then
+            payoutTable[k][2] = searchContainer(v.shareZone.getObjects(), fakeCaller, payoutTable[k][2])
+        end
+        --search the player's hand
+        payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), fakeCaller, payoutTable[k][2])
+    end
+
+    --tabulate company privates
+    for k,v in pairs(gameEntities.COMPANIES) do
+        if v.COMPANIES_CAN_OWN_PRIVATES then
+            payoutTable[k] = {v,0}
+            waitFlags[k] = false
+
+            --Dynamically spawn a scripting zone to on the charter
+            local bb = getObjectFromGUID(v.charterGUID).getBoundsNormalized()
+            local params = {}
+            local callbackName = "callback" .. k .. "private"
+            params.position = getObjectFromGUID(v.charterGUID).getPosition()
+            params.rotation = getObjectFromGUID(v.charterGUID).getRotation()
+            params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
+            params.callback = callbackName
+            params.type = 'ScriptingTrigger'
+            params.sound = false
+            local zone = spawnObject(params)
+
+            local callbackFunc = function()
+                payoutTable[k][2] = searchContainer(zone.getObjects(), fakeCaller, payoutTable[k][2])
+                waitFlags[k] = true
+                zone.destruct()
+            end
+            Global.setVar(callbackName, callbackFunc)
+        end
+    end
+
+    Wait.condition(
+    function()
+        transferPrivatePayouts(payoutTable)
+    end,
+    function()
+        local temp = true
+        for k,v in pairs(waitFlags) do
+            temp = temp and v
+        end
+        return temp
+    end)
+end
+
+function transferPrivatePayouts(payoutTable)
+    printToAll("--- Privates pay out ---")
+    for k,v in pairs(payoutTable) do
+        if (v[2]>0) then
+            transferMoneyWithBank(v[1], v[2], false, false)
+            printToAll(v[1].name .. 'paid ' .. formatLabel(v[2]) .. ' for Privates')
         end
     end
 end
@@ -587,3 +694,11 @@ payHalfParams.rotation = {0,180,0}
 payHalfParams.width = 400
 payHalfParams.height = 100
 payHalfParams.font_size = 50
+
+payPrivatesParams = {}
+payPrivatesParams.label = 'Pay Privates'
+payPrivatesParams.click_function = 'payPrivates'
+payPrivatesParams.position = {0,0.25,0}
+payPrivatesParams.width = 600
+payPrivatesParams.height = 150
+payPrivatesParams.font_size = 75
