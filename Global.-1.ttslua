@@ -9,7 +9,7 @@ gameOptions = {
     BANK_SIZE = 12000,
 
     MONEY_SYMBOL = '$',
-    MONEY_SYMBOL_POSITION = 'front',
+    MONEY_SYMBOL_POSITION = 'front', --'end'
 
     TRANSACTION_LOG_GUID = nil,
 
