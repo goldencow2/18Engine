@@ -1,0 +1,87 @@
+{
+  "SaveName": "",
+  "GameMode": "",
+  "Gravity": 0.5,
+  "PlayArea": 0.5,
+  "Date": "",
+  "Table": "",
+  "Sky": "",
+  "Note": "",
+  "Rules": "",
+  "XmlUI": "",
+  "LuaScript": "",
+  "LuaScriptState": "",
+  "ObjectStates": [
+    {
+      "Name": "Custom_Tile",
+      "Transform": {
+        "posX": 0.0150622437,
+        "posY": 1.47411549,
+        "posZ": -25.0356445,
+        "rotX": 0.0168842636,
+        "rotY": 179.99968,
+        "rotZ": 0.07987138,
+        "scaleX": 1.37326944,
+        "scaleY": 1.0,
+        "scaleZ": 1.37326944
+      },
+      "Nickname": "",
+      "Description": "",
+      "GMNotes": "",
+      "ColorDiffuse": {
+        "r": 0.630030751,
+        "g": 0.7340404,
+        "b": 0.745644569
+      },
+      "Locked": false,
+      "Grid": false,
+      "Snap": false,
+      "IgnoreFoW": false,
+      "Autoraise": true,
+      "Sticky": true,
+      "Tooltip": true,
+      "GridProjection": false,
+      "HideWhenFaceDown": false,
+      "Hands": false,
+      "CustomImage": {
+        "ImageURL": "http://cloud-3.steamusercontent.com/ugc/933805219274701588/9F53E20E8284E8E4C2CB4642DFD5848FCC9C5E2E/",
+        "ImageSecondaryURL": "",
+        "ImageScalar": 1.0,
+        "WidthScale": 0.0,
+        "CustomTile": {
+          "Type": 0,
+          "Thickness": 0.1,
+          "Stackable": false,
+          "Stretch": true
+        }
+      },
+      "XmlUI": "",
+      "LuaScript": "",
+      "LuaScriptState": "",
+      "JointFixed": {
+        "ConnectedBodyGUID": "cdfbb8",
+        "EnableCollision": false,
+        "Axis": {
+          "x": 1.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "Anchor": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "ConnectedAnchor": {
+          "x": -0.02168021,
+          "y": 0.009999806,
+          "z": -1.12146187
+        },
+        "BreakForce": "Infinity",
+        "BreakTorgue": "Infinity"
+      },
+      "GUID": "41571c"
+    }
+  ],
+  "TabStates": {},
+  "VersionNumber": ""
+}
