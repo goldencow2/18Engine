@@ -49,28 +49,28 @@ gameEntities = {
 
     }, COMPANIES = {
             ['Example Company'] = {
+                inputCounterGUID = 'ABCD',
                 moneyLabelGUID = '1234',
-                inputCounterGUID = 'abcd',
                 charterGUID = 'wxyz',
             },
 
             ['Example Company2'] = {
-                moneyLabelGUID = '1234',
-                inputCounterGUID = 'abcd',
-                charterGUID = 'wxyz',
+                inputCounterGUID = '',
+                moneyLabelGUID = '',
+                charterGUID = '',
             },
 
             --- etc.
 
     }, PLAYERS = {
             ['Red'] = {
-                moneyLabelGUID = '1234',
-                inputCounterGUID = '5678',
+                inputCounterGUID = '',
+                moneyLabelGUID = '',
             },
 
             ['White'] = {
-                moneyLabelGUID = '706099',
-                inputCounterGUID = 'dbc540',
+                inputCounterGUID = '',
+                moneyLabelGUID = '',
             },
 
             --- etc.
@@ -96,8 +96,11 @@ gameOptionDefaults = {
     CHARTER_SHARES_PAY_COMPANY = false,
     COMPANIES_CAN_CROSS_INVEST = false, --Companies can own shares in other companies (the script will pay foreign shares on charters)
     SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false, --The number appended to a share's description is the % of the revenue it will receive e.g 'B&O20' = 20%, 'UdW5' = 5%
-    USE_PRIVATES = false; --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
-    COMPANIES_CAN_OWN_PRIVATES = true; --if set to false, the script won't ask you to supply charter GUIDs (Note: not implemented yet)
+    USE_PRIVATES = false, --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
+    COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs (Note: not implemented yet)
+
+    COMPANY_CHARTERS_ARE_SHARES = false, --The charter itself represents 1 share.
+    --This will also set the company to assume only 1 share exists, and the player who presses the payout button will be paid for it.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
@@ -158,6 +161,14 @@ function initCompanies()
         if not company.shareDescription then company.shareDescription = k end
         if not company.issueSize then company.issueSize = 10 end
         if not company.treasury then company.treasury = 0 end
+
+        if company.COMPANY_CHARTERS_ARE_SHARES then
+            company.issueSize = 1
+            company.SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false
+            company.HALF_PAY_ROUND = 1
+            getObjectFromGUID(company.inputCounterGUID).setName('This Company will pay the player who clicks the button.')
+        end
+
         updateLabel(company)
 
         --fucking LUA wizardry
@@ -169,7 +180,7 @@ function initCompanies()
 
         if company.COMPANIES_CAN_HALF_PAY then
             local payFuncName = k .. 'PayHalf'
-            local payFunc = function(object, color) buttonHelper(company, 'PayHalf') end
+            local payFunc = function(object, color) buttonHelper(company, 'PayHalf', color) end
             Global.setVar(payFuncName, payFunc)
             pHParam.click_function = payFuncName
             getObjectFromGUID(company.inputCounterGUID).createButton(pHParam)
@@ -177,7 +188,7 @@ function initCompanies()
 
         if company.COMPANIES_CAN_FULL_PAY then
             local payFuncName = k .. 'Payout'
-            local payFunc = function(object, color) buttonHelper(company, 'Payout') end
+            local payFunc = function(object, color) buttonHelper(company, 'Payout', color) end
             Global.setVar(payFuncName, payFunc)
             pFParam.click_function = payFuncName
             getObjectFromGUID(company.inputCounterGUID).createButton(pFParam)
@@ -336,19 +347,19 @@ function initLog()
     end
 end
 
-function buttonHelper(caller, type)
+function buttonHelper(caller, type, color)
     local amount = getObjectFromGUID(caller.inputCounterGUID).getValue()
     if amount == 0 then return end
     printToAll('') --newline
     if type == 'Bank Transfer' then
         transferMoneyWithBank(caller, amount, true, true)
     elseif type == 'Payout' then
-        Payout(caller, amount)
+        Payout(caller, amount, color)
     elseif type == 'Withhold' then
         Withhold(caller, amount)
     elseif type == 'PayHalf' then
-        Payout(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, true))
-        Withhold(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, false))
+        Payout(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, true), color)
+        Withhold(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, false), color)
     end
 end
 
@@ -373,71 +384,47 @@ function Withhold(caller, amount)
     printToAll('*** ' .. caller.name .. ' WITHOLDS ' .. formatLabel(amount) .. ' ***')
 end
 
-function Payout(caller, amount)
+function Payout(caller, amount, color)
     local payoutTable = {}
     --Part of this function spawns ScriptingZones, which take more than one frame to load.
     --The waitFlags are used to make sure all ScriptingZones have loaded and done their thing before continuing.
+
     local waitFlags = {}
 
-    --tabulate player shares
-    for k,v in pairs(gameEntities.PLAYERS) do
-        payoutTable[k] = {v, 0}
-        --if player has a designated zone, search that for shares matching this company
-        if v.shareZone then
-            payoutTable[k][2] = searchContainer(v.shareZone.getObjects(), caller, payoutTable[k][2])
-        end
-        --search the player's hand
-        payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
-    end
-
-    --tabulate company shares
-        payoutTable[caller.key] = {caller, 0}
-        --bank pool
-        if caller.BANK_POOL_SHARES_PAY_COMPANY then
-            payoutTable[caller.key][2] = searchContainer(BANK_POOL_ZONE.getObjects(), caller, payoutTable[caller.key][2])
-        end
-        --IPO
-        if caller.IPO_SHARES_PAY_COMPANY then
-            payoutTable[caller.key][2] = searchContainer(IPO_ZONE.getObjects(), caller, payoutTable[caller.key][2])
-        end
-        --Charter
-        if caller.CHARTER_SHARES_PAY_COMPANY then
-            waitFlags[caller.key] = false
-
-            --Dynamically spawn a scripting zone to on the charter
-            local bb = getObjectFromGUID(caller.charterGUID).getBoundsNormalized()
-            local params = {}
-            local callbackName = "callback" .. caller.key
-            params.position = getObjectFromGUID(caller.charterGUID).getPosition()
-            params.rotation = getObjectFromGUID(caller.charterGUID).getRotation()
-            params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
-            params.callback = callbackName
-            params.type = 'ScriptingTrigger'
-            params.sound = false
-            local zone = spawnObject(params)
-
-            local callbackFunc = function()
-                payoutTable[caller.key][2] = searchContainer(zone.getObjects(), caller, payoutTable[caller.key][2])
-                waitFlags[caller.key] = true
-                zone.destruct()
+    if caller.COMPANY_CHARTERS_ARE_SHARES then
+        payoutTable[color] = {gameEntities.PLAYERS[color], 1}
+    else
+        --tabulate player shares
+        for k,v in pairs(gameEntities.PLAYERS) do
+            payoutTable[k] = {v, 0}
+            --if player has a designated zone, search that for shares matching this company
+            if v.shareZone then
+                payoutTable[k][2] = searchContainer(v.shareZone.getObjects(), caller, payoutTable[k][2])
             end
-            Global.setVar(callbackName, callbackFunc)
+            --search the player's hand
+            payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
         end
 
-    --tabulate shares on other companies
-    if caller.COMPANIES_CAN_CROSS_INVEST then
-
-        for k,v in pairs(gameEntities.COMPANIES) do
-            if k~=caller.key then
-                payoutTable[k] = {v,0}
-                waitFlags[k] = false
+        --tabulate company shares
+            payoutTable[caller.key] = {caller, 0}
+            --bank pool
+            if caller.BANK_POOL_SHARES_PAY_COMPANY then
+                payoutTable[caller.key][2] = searchContainer(BANK_POOL_ZONE.getObjects(), caller, payoutTable[caller.key][2])
+            end
+            --IPO
+            if caller.IPO_SHARES_PAY_COMPANY then
+                payoutTable[caller.key][2] = searchContainer(IPO_ZONE.getObjects(), caller, payoutTable[caller.key][2])
+            end
+            --Charter
+            if caller.CHARTER_SHARES_PAY_COMPANY then
+                waitFlags[caller.key] = false
 
                 --Dynamically spawn a scripting zone to on the charter
-                local bb = getObjectFromGUID(v.charterGUID).getBoundsNormalized()
+                local bb = getObjectFromGUID(caller.charterGUID).getBoundsNormalized()
                 local params = {}
-                local callbackName = "callback" .. k
-                params.position = getObjectFromGUID(v.charterGUID).getPosition()
-                params.rotation = getObjectFromGUID(v.charterGUID).getRotation()
+                local callbackName = "callback" .. caller.key
+                params.position = getObjectFromGUID(caller.charterGUID).getPosition()
+                params.rotation = getObjectFromGUID(caller.charterGUID).getRotation()
                 params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
                 params.callback = callbackName
                 params.type = 'ScriptingTrigger'
@@ -445,26 +432,56 @@ function Payout(caller, amount)
                 local zone = spawnObject(params)
 
                 local callbackFunc = function()
-                    payoutTable[k][2] = searchContainer(zone.getObjects(), caller, payoutTable[k][2])
-                    waitFlags[k] = true
+                    payoutTable[caller.key][2] = searchContainer(zone.getObjects(), caller, payoutTable[caller.key][2])
+                    waitFlags[caller.key] = true
                     zone.destruct()
                 end
                 Global.setVar(callbackName, callbackFunc)
             end
+
+        --tabulate shares on other companies
+        if caller.COMPANIES_CAN_CROSS_INVEST then
+
+            for k,v in pairs(gameEntities.COMPANIES) do
+                if k~=caller.key then
+                    payoutTable[k] = {v,0}
+                    waitFlags[k] = false
+
+                    --Dynamically spawn a scripting zone to on the charter
+                    local bb = getObjectFromGUID(v.charterGUID).getBoundsNormalized()
+                    local params = {}
+                    local callbackName = "callback" .. k
+                    params.position = getObjectFromGUID(v.charterGUID).getPosition()
+                    params.rotation = getObjectFromGUID(v.charterGUID).getRotation()
+                    params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
+                    params.callback = callbackName
+                    params.type = 'ScriptingTrigger'
+                    params.sound = false
+                    local zone = spawnObject(params)
+
+                    local callbackFunc = function()
+                        payoutTable[k][2] = searchContainer(zone.getObjects(), caller, payoutTable[k][2])
+                        waitFlags[k] = true
+                        zone.destruct()
+                    end
+                    Global.setVar(callbackName, callbackFunc)
+                end
+            end
+
         end
 
     end
-        Wait.condition(
-        function()
-            transferPayouts(caller, payoutTable, amount)
-        end,
-        function()
-            local temp = true
-            for k,v in pairs(waitFlags) do
-                temp = temp and v
-            end
-            return temp
-        end)
+            Wait.condition(
+            function()
+                transferPayouts(caller, payoutTable, amount)
+            end,
+            function()
+                local temp = true
+                for k,v in pairs(waitFlags) do
+                    temp = temp and v
+                end
+                return temp
+            end)
 end
 
 function transferPayouts(caller, payoutTable, amount)
@@ -610,7 +627,7 @@ function updateLabel(table_entry)
     button_parameters.click_function = 'nilFunction'
     button_parameters.label = formatLabel(table_entry.treasury)
     button_parameters.position = {0, 0.11, 0}
-    button_parameters.rotation = {0, 180, 0}
+    button_parameters.rotation = {0, 0, 0}
     button_parameters.width = 0
     button_parameters.height = 0
     button_parameters.font_size = 700
