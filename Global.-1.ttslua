@@ -566,10 +566,12 @@ end
 function addShare(description, caller, count)
     --if description includes the caller's expected description then add to num
     if (string.find(description, caller.shareDescription)) then
-        return count + tonumber(string.sub(description, 1+#caller.shareDescription))
-    else
-        return count
+        local num = tonumber(string.sub(description, 1+#caller.shareDescription))
+        if num ~= nil then
+            return (count + num)
+        end
     end
+    return count
 end
 
 ---MISC. HELPER FUNCTIONS---
