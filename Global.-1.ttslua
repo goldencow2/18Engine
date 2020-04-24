@@ -54,7 +54,6 @@ gameEntities = {
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
 gameOptionDefaults = {
-    COMPANIES_CAN_WITHHOLD = true,
     COMPANIES_CAN_FULL_PAY = true,
     COMPANIES_CAN_HALF_PAY = false,
     HALF_PAY_ROUND = 10, --Round the payout of a half-pay to the nearest multiple of this, in favor of the players.
@@ -74,6 +73,7 @@ gameOptionDefaults = {
 
     COMPANY_CHARTERS_ARE_SHARES = false, --The charter itself represents 1 share.
     --This will also set the company to assume only 1 share exists, and the player who presses the payout button will be paid for it.
+    --This also sets the HALF_PAY_ROUND for the company to 1.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
@@ -178,13 +178,11 @@ function initCompanies()
         bTParam.click_function = bankFuncName
         getObjectFromGUID(company.inputCounterGUID).createButton(bTParam)
 
-        if company.COMPANIES_CAN_WITHHOLD then
-            local withholdFuncName = k .. 'withholdTransfer'
-            local withholdFunc = function(object, color) buttonHelper(company, 'Withhold') end
-            Global.setVar(withholdFuncName, withholdFunc)
-            wParam.click_function = withholdFuncName
-            getObjectFromGUID(company.inputCounterGUID).createButton(wParam)
-        end
+        local withholdFuncName = k .. 'withholdTransfer'
+        local withholdFunc = function(object, color) buttonHelper(company, 'Withhold') end
+        Global.setVar(withholdFuncName, withholdFunc)
+        wParam.click_function = withholdFuncName
+        getObjectFromGUID(company.inputCounterGUID).createButton(wParam)
     end
 end
 
@@ -222,6 +220,12 @@ function initPlayers()
         Global.setVar(bankFuncName, bankFunc)
         bankTransferParams.click_function = bankFuncName
         getObjectFromGUID(player.inputCounterGUID).createButton(bankTransferParams)
+
+        local withholdFuncName = k .. 'withholdTransfer'
+        local withholdFunc = function(object, color) buttonHelper(player, 'Withhold') end
+        Global.setVar(withholdFuncName, withholdFunc)
+        withholdParams.click_function = withholdFuncName
+        getObjectFromGUID(player.inputCounterGUID).createButton(withholdParams)
     end
 end
 
@@ -323,14 +327,15 @@ end
 function buttonHelper(caller, type, color)
     local amount = getObjectFromGUID(caller.inputCounterGUID).getValue()
     if amount == 0 then return end
-    printToAll('') --newline
     if type == 'Bank Transfer' then
+        amount = amount*-1
         transferMoneyWithBank(caller, amount, true, true)
     elseif type == 'Payout' then
         Payout(caller, amount, color)
     elseif type == 'Withhold' then
         Withhold(caller, amount)
     elseif type == 'PayHalf' then
+        printToAll('')
         Payout(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, true), color)
         Withhold(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, false), color)
     end
@@ -353,8 +358,7 @@ function transferMoneyWithBank(caller, amount, print, log)
 end
 
 function Withhold(caller, amount)
-    transferMoneyWithBank(caller, amount, false, true)
-    printToAll('*** ' .. caller.name .. ' WITHOLDS ' .. formatLabel(amount) .. ' ***')
+    transferMoneyWithBank(caller, amount, true, true)
 end
 
 function Payout(caller, amount, color)
@@ -655,21 +659,22 @@ end
 ERROR_COLOR = {r=1, g=0, b=0}
 
 bankTransferParams = {}
-bankTransferParams.label = 'Bank Transfer'
-bankTransferParams.position = {0,0.1,0.5}
+bankTransferParams.label = 'Spend Money'
+bankTransferParams.position = {0.45,0.1,0.5}
 bankTransferParams.rotation = {0,180,0}
 bankTransferParams.width = 400
 bankTransferParams.height = 100
 bankTransferParams.font_size = 50
-bankTransferParams.tooltip = 'Input a positive number in your counter to receive money. Input a negative number to spend money.'
+bankTransferParams.tooltip = 'Send money to the bank'
 
 withholdParams = {}
-withholdParams.label = 'Withhold'
-withholdParams.position = {1,0.1,0}
+withholdParams.label = 'Take Money'
+withholdParams.position = {-0.45,0.1,0.5}
 withholdParams.rotation = {0,180,0}
 withholdParams.width = 400
 withholdParams.height = 100
 withholdParams.font_size = 50
+withholdParams.tooltip = 'Take money from the bank'
 
 payFullParams = {}
 payFullParams.label = 'Payout'
