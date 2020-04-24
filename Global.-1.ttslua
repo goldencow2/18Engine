@@ -1,10 +1,11 @@
+--Any line proceeded by -- is a lua comment, and can safely be deleted.
+
 --This script is powered by 18Engine, an easy-to-use, all-purpose script for 18xx games.
 --https://github.com/goldencow2/18Engine/wiki
 
---Any line proceeded by -- is a lua comment, and can safely be deleted.
-
-USE_SAVES = false --set this to false while editing your mod or things like company treasuries, etc. will persist
-                  --set this to true, copy in the script, use "save and play" from the modding menu, and then actually save your mod to enable saves (TTS is dumb).
+USE_SAVES = false
+--set this to false while editing your mod or things like company treasuries, etc. will persist
+--set this to true, copy in the script, use "save and play" from the modding menu, and then actually save your mod to enable saves (TTS is dumb).
 
 gameOptions = {
 
@@ -12,7 +13,6 @@ gameOptions = {
 
 gameEntities = {
     OTHER_ACTORS = {
-            --Do not change the word 'BANK'; the script expects it.
             ['BANK'] = {
                 moneyLabelGUID = '',
             },
