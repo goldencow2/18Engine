@@ -50,7 +50,6 @@ gameEntities = {
 
     }
 }
-
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
 gameOptionDefaults = {
@@ -464,8 +463,10 @@ end
 function transferPayouts(caller, payoutTable, amount)
     printToAll("--- " .. caller.name .. " pays out " .. formatLabel(amount) .. " ---")
     logTransaction(amount, 'Bank', caller.name .. ' Shares', false, true)
+    local someoneGotPaid = false
     for k,v in pairs(payoutTable) do
         if (v[2]~=0) then
+            someoneGotPaid = true
             local calc = 0
             local string = ''
             if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
@@ -479,6 +480,7 @@ function transferPayouts(caller, payoutTable, amount)
             printToAll(string)
         end
     end
+    if not someoneGotPaid then broadcastToAll('No company or player was paid dividends. Make sure shares are in hand or on charters.') end
 end
 
 function payPrivates()
@@ -543,12 +545,15 @@ end
 
 function transferPrivatePayouts(payoutTable)
     printToAll("--- Privates pay out ---")
+    local someoneGotPaid = false
     for k,v in pairs(payoutTable) do
         if (v[2]~=0) then
             transferMoneyWithBank(v[1], v[2], false, false)
             printToAll(v[1].name .. ' paid ' .. formatLabel(v[2]) .. ' for Privates')
+            someoneGotPaid = true
         end
     end
+    if not someoneGotPaid then broadcastToAll('No company or player was paid revenue. Make sure private companies are in hand or on charters.') end
 end
 
 function searchContainer(container, caller, count)
