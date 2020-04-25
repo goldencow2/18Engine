@@ -465,7 +465,7 @@ function transferPayouts(caller, payoutTable, amount)
     printToAll("--- " .. caller.name .. " pays out " .. formatLabel(amount) .. " ---")
     logTransaction(amount, 'Bank', caller.name .. ' Shares', false, true)
     for k,v in pairs(payoutTable) do
-        if (v[2]>0) then
+        if (v[2]~=0) then
             local calc = 0
             local string = ''
             if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
