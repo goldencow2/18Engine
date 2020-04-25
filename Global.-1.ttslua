@@ -136,7 +136,7 @@ function initCompanies()
         if not company.treasury then company.treasury = 0 end
 
         if company.COMPANY_CHARTERS_ARE_SHARES then
-            company.issueSize = 1
+            company.issueSize = 2
             company.SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false
             company.HALF_PAY_ROUND = 1
             getObjectFromGUID(company.inputCounterGUID).setName('This Company will pay the player who clicks the button.')
@@ -369,7 +369,7 @@ function Payout(caller, amount, color)
     local waitFlags = {}
 
     if caller.COMPANY_CHARTERS_ARE_SHARES then
-        payoutTable[color] = {gameEntities.PLAYERS[color], 1}
+        payoutTable[color] = {gameEntities.PLAYERS[color], 2}
     else
         --tabulate player shares
         for k,v in pairs(gameEntities.PLAYERS) do
@@ -696,6 +696,6 @@ payPrivatesParams = {}
 payPrivatesParams.label = 'Pay Privates'
 payPrivatesParams.click_function = 'payPrivates'
 payPrivatesParams.position = {0,0.25,0}
-payPrivatesParams.width = 600
-payPrivatesParams.height = 150
-payPrivatesParams.font_size = 75
+payPrivatesParams.width = 1600
+payPrivatesParams.height = 450
+payPrivatesParams.font_size = 225
