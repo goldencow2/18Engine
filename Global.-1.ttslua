@@ -544,7 +544,7 @@ end
 function transferPrivatePayouts(payoutTable)
     printToAll("--- Privates pay out ---")
     for k,v in pairs(payoutTable) do
-        if (v[2]>0) then
+        if (v[2]~=0) then
             transferMoneyWithBank(v[1], v[2], false, false)
             printToAll(v[1].name .. ' paid ' .. formatLabel(v[2]) .. ' for Privates')
         end
