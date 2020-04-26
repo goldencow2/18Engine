@@ -207,6 +207,12 @@ function initPlayers()
             player.shareZone = getObjectFromGUID(player.shareZoneGUID)
         end
 
+        local isValidColor = false;
+        for _,c in ipairs(Player.getAvailableColors()) do
+            if (k == c) then isValidColor = true end
+        end
+        if not isValidColor then broadcastToAll('ERROR: Player color ' .. k .. ' is set in gameEntities but no hand zone for ' .. k .. ' was found.', ERROR_COLOR) end
+
         --okay
         player.key = k
         if Player[k].seated then player.name = Player[k].steam_name else player.name = k end
