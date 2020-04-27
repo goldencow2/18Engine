@@ -569,9 +569,11 @@ function searchContainer(container, caller, count)
             --object is a singleton
             count = addShare(o.getDescription(),caller,count)
         else
-            --object is a deck
-            for j,k in ipairs(o.getObjects()) do
-                count = addShare(k.description,caller,count)
+            --object is a deck, or maybe not because getQuanity works for stacks but getObjects does not.
+            if o.tag=='Deck' then
+                for j,k in ipairs(o.getObjects()) do
+                    count = addShare(k.description,caller,count)
+                end
             end
         end
     end
