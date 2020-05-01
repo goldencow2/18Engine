@@ -50,6 +50,9 @@ gameEntities = {
 
     }
 }
+
+---VERSION 1.2.7, copy and paste everything below this line to update!
+
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
 gameOptionDefaults = {
