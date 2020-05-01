@@ -51,7 +51,7 @@ gameEntities = {
     }
 }
 
----VERSION 1.2.7, copy and paste everything below this line to update!
+---VERSION 1.2.8, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -76,6 +76,11 @@ gameOptionDefaults = {
     COMPANY_CHARTERS_ARE_SHARES = false, --The charter itself represents 1 share.
     --This will also set the company to assume only 1 share exists, and the player who presses the payout button will be paid for it.
     --This also sets the HALF_PAY_ROUND for the company to 1.
+
+    PROPORTIONAL_PAYOUTS = false,
+    -- The payout per share will be the total dividend divided by the number of shares paid.
+    -- e.g, if only 7 shares are owned by players/companies then the dividend is split 7 ways.
+    -- The per share dividend is rounded down before multiplying, with any remainder going to the company unless one player/company owns 100% of the shares.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
@@ -472,6 +477,9 @@ end
 function transferPayouts(caller, payoutTable, amount)
     printToAll("--- " .. caller.name .. " pays out " .. formatLabel(amount) .. " ---")
     logTransaction(amount, 'Bank', caller.name .. ' Shares', false, true)
+
+    if caller.PROPORTIONAL_PAYOUTS then transferPropPayouts(caller, payoutTable, amount) return end
+
     local someoneGotPaid = false
     for k,v in pairs(payoutTable) do
         if (v[2]~=0) then
@@ -490,6 +498,35 @@ function transferPayouts(caller, payoutTable, amount)
         end
     end
     if not someoneGotPaid then broadcastToAll('No company or player was paid dividends. Make sure shares are in hand or on charters.') end
+end
+
+function transferPropPayouts(caller, payoutTable, amount)
+    local someoneGotPaid = false
+    local allOne = true
+    local shareCount = 0
+    local perShare = 0
+    local remainder = 0
+    for k,v in pairs(payoutTable) do
+        if (shareCount~=0 and v[2]~=0) then allOne = false end
+        shareCount = shareCount + v[2]
+    end
+    perShare = math.floor(amount/shareCount)
+    remainder = amount - shareCount*perShare
+
+    for k,v in pairs(payoutTable) do
+        local calc = 0
+        if (v[2]~=0) then
+            if allOne then
+                calc = amount
+            else
+                calc = v[2]*perShare
+            end
+            string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2] .. '/' .. shareCount .. ')'
+            transferMoneyWithBank(v[1], calc, false, false)
+            printToAll(string)
+        end
+    end
+    if not allOne then Withhold(caller, remainder) end
 end
 
 function payPrivates()
