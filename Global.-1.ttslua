@@ -51,7 +51,7 @@ gameEntities = {
     }
 }
 
----VERSION 1.2.8, copy and paste everything below this line to update!
+---VERSION 1.2.9, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -62,7 +62,7 @@ gameOptionDefaults = {
     BANK_SIZE = nil,
     TRANSACTION_LOG_GUID = nil,
     MONEY_SYMBOL = nil,
-    MONEY_SYMBOL_POSITION = 'front', --'end'
+    MONEY_SYMBOL_POSITION = nil,
     BANK_POOL_SHARES_PAY_COMPANY = false,
     BANK_POOL_ZONE_GUID = nil,
     IPO_SHARES_PAY_COMPANY = false,
@@ -212,7 +212,6 @@ function initPlayers()
             if not getObjectFromGUID(player.shareZoneGUID) then
                 broadcastToAll('ERROR: shareZoneGUID is set and an object could not be found for the ' .. k .. ' Player\'s shareZoneGUID.', ERROR_COLOR) return
             end
-            player.shareZone = getObjectFromGUID(player.shareZoneGUID)
         end
 
         local isValidColor = false;
@@ -388,8 +387,8 @@ function Payout(caller, amount, color)
         for k,v in pairs(gameEntities.PLAYERS) do
             payoutTable[k] = {v, 0}
             --if player has a designated zone, search that for shares matching this company
-            if v.shareZone then
-                payoutTable[k][2] = searchContainer(v.shareZone.getObjects(), caller, payoutTable[k][2])
+            if getObjectFromGUID(v.shareZoneGUID) then
+                payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), caller, payoutTable[k][2])
             end
             --search the player's hand
             payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
@@ -542,8 +541,8 @@ function payPrivates()
     for k,v in pairs(gameEntities.PLAYERS) do
         payoutTable[k] = {v, 0}
         --if player has a designated zone, search that for shares matching this company
-        if v.shareZone then
-            payoutTable[k][2] = searchContainer(v.shareZone.getObjects(), fakeCaller, payoutTable[k][2])
+        if getObjectFromGUID(v.shareZoneGUID) then
+            payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), fakeCaller, payoutTable[k][2])
         end
         --search the player's hand
         payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), fakeCaller, payoutTable[k][2])
