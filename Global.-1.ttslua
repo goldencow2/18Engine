@@ -4,8 +4,10 @@
 --https://github.com/goldencow2/18Engine/wiki
 
 USE_SAVES = false
---set this to false while editing your mod or things like company treasuries, etc. will persist
+--set this to false while editing your mod or treasuries will persist.
 --set this to true, copy in the script, use "save and play" from the modding menu, and then actually save your mod to enable saves (TTS is dumb).
+--WARNING: If you intend on modifying any gameOptions, turn use_saves to false first.
+---------- As of this writing this should only be an issue for BANK_SIZE.
 
 gameOptions = {
 
@@ -51,7 +53,7 @@ gameEntities = {
     }
 }
 
----VERSION 1.2.9, copy and paste everything below this line to update!
+---VERSION 2.0, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -84,15 +86,36 @@ gameOptionDefaults = {
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
+SAVE_STATE = {
+    versionNumber = 2.0
+}
+
 function onSave()
-    saved_data = JSON.encode(gameEntities)
-    if not USE_SAVES then saved_data = '' end
+    --saved_data = JSON.encode(gameEntities)
+    if not USE_SAVES then
+        saved_data = ''
+    else
+        --bank amount
+        SAVE_STATE['Bank Treasury'] = gameEntities.OTHER_ACTORS['BANK'].treasury
+
+        --company treasuries
+        for k,company in pairs(gameEntities.COMPANIES) do
+            SAVE_STATE['Company ' .. k] = company.treasury
+        end
+
+        --player treasuries
+        for k,player in pairs(gameEntities.PLAYERS) do
+            SAVE_STATE['Player ' .. k] = player.treasury
+        end
+
+        saved_data = JSON.encode(SAVE_STATE)
+    end
     return saved_data
 end
 
 function onload(saved_data)
     if saved_data~='' then
-        gameEntities = JSON.decode(saved_data)
+        SAVE_STATE = JSON.decode(saved_data)
     end
     initCompanies()
     initPlayers()
@@ -140,7 +163,11 @@ function initCompanies()
         if not company.name then company.name = k end
         if not company.shareDescription then company.shareDescription = k end
         if not company.issueSize then company.issueSize = 10 end
-        if not company.treasury then company.treasury = 0 end
+        if SAVE_STATE['Company ' .. k] then
+            company.treasury = SAVE_STATE['Company ' .. k]
+        else
+            company.treasury = 0
+        end
 
         if company.COMPANY_CHARTERS_ARE_SHARES then
             company.issueSize = 2
@@ -223,7 +250,11 @@ function initPlayers()
         --okay
         player.key = k
         if Player[k].seated then player.name = Player[k].steam_name else player.name = k end
-        if not player.treasury then player.treasury = 0 end
+        if SAVE_STATE['Player ' .. k] then
+            player.treasury = SAVE_STATE['Player ' .. k]
+        else
+            player.treasury = 0
+        end
         updateLabel(player)
 
         --Using a locally defined function as the click_function allows us to access the other local variables in this for loop
@@ -298,7 +329,12 @@ function initBank()
         end
 
         --Okay
-        if not gameEntities.OTHER_ACTORS['BANK'].treasury then gameEntities.OTHER_ACTORS['BANK'].treasury = gameOptions.BANK_SIZE end
+        if SAVE_STATE['Bank Treasury'] then
+            gameEntities.OTHER_ACTORS['BANK'].treasury = SAVE_STATE['Bank Treasury']
+        else
+            gameEntities.OTHER_ACTORS['BANK'].treasury = gameOptions.BANK_SIZE
+        end
+
         updateLabel(gameEntities.OTHER_ACTORS['BANK'])
     end
 end
