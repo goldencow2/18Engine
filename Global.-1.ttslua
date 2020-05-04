@@ -53,7 +53,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.1, copy and paste everything below this line to update!
+---VERSION 2.2, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -91,11 +91,14 @@ gameOptionDefaults = {
     --how many shares the company has. Irrelevant if SHARE_DESCRIPTIONS_ARE_PERCENTAGE is set.
     --If entered as a table, e.g, ISSUE_SIZE = {2,5,10},
     --then a button is created allowing the company to change issue size mid-game, defaulting to the first value listed.
+
+    COMPANY_CREDITS = false
+    -- Companies will not take from or give money to the bank. Only relevant if BANK_SIZE is set.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.1
+    versionNumber = 2.2
 }
 
 function onSave()
@@ -473,7 +476,7 @@ function transferMoneyWithBank(caller, amount, print, log)
     --log = boolean, print to the log object?
     caller.treasury = caller.treasury + amount
     updateLabel(caller)
-    if USE_BANK then
+    if USE_BANK and not caller.COMPANY_CREDITS then
         gameEntities.OTHER_ACTORS['BANK'].treasury = gameEntities.OTHER_ACTORS['BANK'].treasury - amount
         updateLabel(gameEntities.OTHER_ACTORS['BANK'])
     end
