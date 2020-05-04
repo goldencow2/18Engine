@@ -53,14 +53,17 @@ gameEntities = {
     }
 }
 
----VERSION 2.0, copy and paste everything below this line to update!
+---VERSION 2.1, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
 gameOptionDefaults = {
     COMPANIES_CAN_FULL_PAY = true,
     COMPANIES_CAN_HALF_PAY = false,
+
     HALF_PAY_ROUND = 10, --Round the payout of a half-pay to the nearest multiple of this, in favor of the players.
+    -- this can be entered as a table, e.g, HALF_PAY_ROUND = {2,5,10} if you are using multiple values for ISSUE_SIZE (see below)
+
     BANK_SIZE = nil,
     TRANSACTION_LOG_GUID = nil,
     MONEY_SYMBOL = nil,
@@ -83,11 +86,16 @@ gameOptionDefaults = {
     -- The payout per share will be the total dividend divided by the number of shares paid.
     -- e.g, if only 7 shares are owned by players/companies then the dividend is split 7 ways.
     -- The per share dividend is rounded down before multiplying, with any remainder going to the company unless one player/company owns 100% of the shares.
+
+    ISSUE_SIZE = 10,
+    --how many shares the company has. Irrelevant if SHARE_DESCRIPTIONS_ARE_PERCENTAGE is set.
+    --If entered as a table, e.g, ISSUE_SIZE = {2,5,10},
+    --then a button is created allowing the company to change issue size mid-game, defaulting to the first value listed.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.0
+    versionNumber = 2.1
 }
 
 function onSave()
@@ -98,9 +106,14 @@ function onSave()
         --bank amount
         SAVE_STATE['Bank Treasury'] = gameEntities.OTHER_ACTORS['BANK'].treasury
 
-        --company treasuries
+        --company treasuries, company issue sizes and issue indicies
         for k,company in pairs(gameEntities.COMPANIES) do
             SAVE_STATE['Company ' .. k] = company.treasury
+            if (type(company.ISSUE_SIZE) == 'table') then
+                SAVE_STATE['CompanyIS' .. k] = company.issueSize
+                SAVE_STATE['CompanyII' .. k] = company.issueIndex
+            end
+
         end
 
         --player treasuries
@@ -162,7 +175,53 @@ function initCompanies()
         company.key = k
         if not company.name then company.name = k end
         if not company.shareDescription then company.shareDescription = k end
-        if not company.issueSize then company.issueSize = 10 end
+        --if not company.ISSUE_SIZE then company.issueSize = 10 end
+
+        if (type(company.ISSUE_SIZE) == 'table') then
+            --company is capable of being more than one issue size
+
+            --error checking
+            if company.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
+                broadcastToAll('ERROR, ' .. k .. ' Company: SHARE_DESCRIPTIONS_ARE_PERCENTAGE is not compatible with multiple issue sizes.', ERROR_COLOR)
+            end
+            if company.COMPANY_CHARTERS_ARE_SHARES then
+                broadcastToAll('ERROR, ' .. k .. ' Company: COMPANY_CHARTERS_ARE_SHARES is not compatible with multiple issue sizes.', ERROR_COLOR)
+            end
+
+            if SAVE_STATE['CompanyIS' .. k] then
+                company.issueSize = SAVE_STATE['CompanyIS' .. k]
+                company.issueIndex = SAVE_STATE['CompanyII' .. k]
+            else
+                company.issueSize = company.ISSUE_SIZE[1]
+                company.issueIndex = 1
+            end
+        else
+            --company has only one issue size
+            company.issueSize = company.ISSUE_SIZE
+        end
+
+        if (type(company.HALF_PAY_ROUND) == 'table') then
+
+            --error checking
+            if not (type(company.ISSUE_SIZE) == 'table') then
+                broadcastToAll('ERROR, ' .. k .. ' Company: Multiple values given for HALF_PAY_ROUND but only one value given for ISSUE_SIZE', ERROR_COLOR)
+                return
+            end
+
+            if #company.ISSUE_SIZE ~= #company.HALF_PAY_ROUND then
+                broadcastToAll('ERROR, ' .. k .. ' Company: # of values given for HALF_PAY_ROUND does not match # of values given for ISSUE_SIZE', ERROR_COLOR)
+            end
+
+            if SAVE_STATE['CompanyIS' .. k] then
+                company.halfPayRound = company.HALF_PAY_ROUND[company.issueIndex]
+            else
+                company.halfPayRound = company.HALF_PAY_ROUND[1]
+            end
+
+        else
+            company.halfPayRound = company.HALF_PAY_ROUND
+        end
+
         if SAVE_STATE['Company ' .. k] then
             company.treasury = SAVE_STATE['Company ' .. k]
         else
@@ -172,7 +231,7 @@ function initCompanies()
         if company.COMPANY_CHARTERS_ARE_SHARES then
             company.issueSize = 2
             company.SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false
-            company.HALF_PAY_ROUND = 1
+            company.halfPayRound = 1
             getObjectFromGUID(company.inputCounterGUID).setName('This Company will pay the player who clicks the button.')
         end
 
@@ -185,12 +244,17 @@ function initCompanies()
         local pFParam = payFullParams
         local pHParam = payHalfParams
 
+        local btnIndex = 0
+        --increment as buttons are created, because createButton doesn't return the button's index for some fucking reason.
+        --button indexes also start at zero because convention sucks.
+
         if company.COMPANIES_CAN_HALF_PAY then
             local payFuncName = k .. 'PayHalf'
             local payFunc = function(object, color) buttonHelper(company, 'PayHalf', color) end
             Global.setVar(payFuncName, payFunc)
             pHParam.click_function = payFuncName
             getObjectFromGUID(company.inputCounterGUID).createButton(pHParam)
+            btnIndex = btnIndex+1
         end
 
         if company.COMPANIES_CAN_FULL_PAY then
@@ -199,6 +263,7 @@ function initCompanies()
             Global.setVar(payFuncName, payFunc)
             pFParam.click_function = payFuncName
             getObjectFromGUID(company.inputCounterGUID).createButton(pFParam)
+            btnIndex = btnIndex+1
         end
 
         if company.COMPANIES_CAN_HALF_PAY and company.COMPANIES_CAN_FULL_PAY then
@@ -206,17 +271,31 @@ function initCompanies()
             getObjectFromGUID(company.inputCounterGUID).editButton({index=1, label='Pay Full', position = addv(pFParam.position,{0,0,0.2})})
         end
 
+
+        if (type(company.ISSUE_SIZE) == 'table') then
+            local changeSizeFuncName = k .. 'changeSize'
+            local changeSizeFunc = function(object, color) changeSize(company) end
+            Global.setVar(changeSizeFuncName, changeSizeFunc)
+            changeSizeParams.click_function = changeSizeFuncName
+            changeSizeParams.label = company.issueSize .. '-Share'
+            getObjectFromGUID(company.inputCounterGUID).createButton(changeSizeParams)
+            company.changeSizeButtonIndex = btnIndex
+            btnIndex = btnIndex+1
+        end
+
         local bankFuncName = k .. 'bankTransfer'
         local bankFunc = function(object, color) buttonHelper(company, 'Bank Transfer') end
         Global.setVar(bankFuncName, bankFunc)
         bTParam.click_function = bankFuncName
         getObjectFromGUID(company.inputCounterGUID).createButton(bTParam)
+        btnIndex = btnIndex+1
 
         local withholdFuncName = k .. 'withholdTransfer'
         local withholdFunc = function(object, color) buttonHelper(company, 'Withhold') end
         Global.setVar(withholdFuncName, withholdFunc)
         wParam.click_function = withholdFuncName
         getObjectFromGUID(company.inputCounterGUID).createButton(wParam)
+        btnIndex = btnIndex+1
     end
 end
 
@@ -384,8 +463,8 @@ function buttonHelper(caller, type, color)
         Withhold(caller, amount)
     elseif type == 'PayHalf' then
         printToAll('')
-        Payout(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, true), color)
-        Withhold(caller, roundTo(amount/2, caller.HALF_PAY_ROUND, false), color)
+        Payout(caller, roundTo(amount/2, caller.halfPayRound, true), color)
+        Withhold(caller, roundTo(amount/2, caller.halfPayRound, false), color)
     end
 end
 
@@ -668,6 +747,26 @@ end
 
 ---MISC. HELPER FUNCTIONS---
 
+function changeSize(company)
+    company.issueIndex = incLoop(company.issueIndex,#company.ISSUE_SIZE)
+    --broadcastToAll(company.issueIndex .. " : " .. company.ISSUE_SIZE[company.issueIndex])
+    company.issueSize = company.ISSUE_SIZE[company.issueIndex]
+    if (type(company.HALF_PAY_ROUND) == 'table') then
+        company.halfPayRound = company.HALF_PAY_ROUND[company.issueIndex]
+    end
+    getObjectFromGUID(company.inputCounterGUID).editButton({index=company.changeSizeButtonIndex, label=company.ISSUE_SIZE[company.issueIndex]..'-Share',})
+end
+
+function incLoop(input,max)
+    --returns input+1 unless input+1 > max, in which case return 1.
+    --good for looping through tables with numbered indicies.
+    if input+1 > max then
+        return 1
+    else
+        return input+1
+    end
+end
+
 function logTransaction(amount, source, target, print, log)
     local str = os.date("%H:%M - ") .. 'Transferred ' .. formatLabel(amount) .. ' from ' .. source .. ' to ' .. target
     if print then
@@ -787,3 +886,12 @@ payPrivatesParams.position = {0,0.25,0}
 payPrivatesParams.width = 1600
 payPrivatesParams.height = 450
 payPrivatesParams.font_size = 225
+
+changeSizeParams = {}
+changeSizeParams.label = 'filler, set by code'
+changeSizeParams.position = {1,0.1, 0}
+changeSizeParams.rotation = {0,180,0}
+changeSizeParams.width = 400
+changeSizeParams.height = 100
+changeSizeParams.font_size = 75
+changeSizeParams.tooltip = 'Click here to cycle through issue sizes'
