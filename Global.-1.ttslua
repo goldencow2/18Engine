@@ -186,6 +186,7 @@ function initCompanies()
         end
 
         company.key = k
+        if company.name then company.NAME = company.name end --backwards compatibility
         if not company.NAME then company.NAME = k end
         if not company.shareDescription then company.shareDescription = k end
         --if not company.ISSUE_SIZE then company.issueSize = 10 end
