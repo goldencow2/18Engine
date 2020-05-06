@@ -67,7 +67,7 @@ gameOptionDefaults = {
     BANK_SIZE = nil,
     TRANSACTION_LOG_GUID = nil,
     MONEY_SYMBOL = nil,
-    MONEY_SYMBOL_POSITION = nil,
+    MONEY_SYMBOL_POSITION = nil, --'end' to put at end.
     BANK_POOL_SHARES_PAY_COMPANY = false,
     BANK_POOL_ZONE_GUID = nil,
     IPO_SHARES_PAY_COMPANY = false,
@@ -92,8 +92,15 @@ gameOptionDefaults = {
     --If entered as a table, e.g, ISSUE_SIZE = {2,5,10},
     --then a button is created allowing the company to change issue size mid-game, defaulting to the first value listed.
 
-    COMPANY_CREDITS = false
+    COMPANY_CREDITS = false,
     -- Companies will not take from or give money to the bank. Only relevant if BANK_SIZE is set.
+
+    COMPANIES_CAN_BANK_TRANSFER = true,
+    -- If false, the script won't spawn buttons for "take money" and "spend money"
+
+    --NAME = 'name'
+    --! Don't uncomment this, it's documentation. !
+    --setting a company's NAME option will print that name in the logs instead of the table name.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
@@ -145,23 +152,16 @@ end
 function initCompanies()
     for k,company in pairs(gameEntities.COMPANIES) do
         --error checking
-        if not company.moneyLabelGUID then
-            broadcastToAll('ERROR: No "moneyLabelGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
-        end
-        if not getObjectFromGUID(company.moneyLabelGUID) then
-            broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s moneyLabelGUID.', ERROR_COLOR) return
+        if company.moneyLabelGUID then
+            if not getObjectFromGUID(company.moneyLabelGUID) then
+                broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s moneyLabelGUID.', ERROR_COLOR) return
+            end
         end
         if not company.inputCounterGUID then
             broadcastToAll('ERROR: No "inputCounterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
         end
         if not getObjectFromGUID(company.inputCounterGUID) then
             broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s inputCounterGUID.', ERROR_COLOR) return
-        end
-        if not company.charterGUID then
-            broadcastToAll('ERROR: No "charterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
-        end
-        if not getObjectFromGUID(company.charterGUID) then
-            broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s charterGUID.', ERROR_COLOR) return
         end
 
         --Copy over or override global options
@@ -175,8 +175,18 @@ function initCompanies()
             end
         end
 
+        --check for a charter if one is required.
+        if ( (company.CHARTER_SHARES_PAY_COMPANY) or (company.COMPANIES_CAN_CROSS_INVEST) or (company.USE_PRIVATES and company.COMPANIES_CAN_OWN_PRIVATES) ) then
+            if not company.charterGUID then
+                broadcastToAll('ERROR: No "charterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
+            end
+            if not getObjectFromGUID(company.charterGUID) then
+                broadcastToAll('ERROR: An object could not be found for the ' .. k .. ' Company\'s charterGUID.', ERROR_COLOR) return
+            end
+        end
+
         company.key = k
-        if not company.name then company.name = k end
+        if not company.NAME then company.NAME = k end
         if not company.shareDescription then company.shareDescription = k end
         --if not company.ISSUE_SIZE then company.issueSize = 10 end
 
@@ -286,19 +296,21 @@ function initCompanies()
             btnIndex = btnIndex+1
         end
 
-        local bankFuncName = k .. 'bankTransfer'
-        local bankFunc = function(object, color) buttonHelper(company, 'Bank Transfer') end
-        Global.setVar(bankFuncName, bankFunc)
-        bTParam.click_function = bankFuncName
-        getObjectFromGUID(company.inputCounterGUID).createButton(bTParam)
-        btnIndex = btnIndex+1
+        if company.COMPANIES_CAN_BANK_TRANSFER then
+            local bankFuncName = k .. 'bankTransfer'
+            local bankFunc = function(object, color) buttonHelper(company, 'Bank Transfer') end
+            Global.setVar(bankFuncName, bankFunc)
+            bTParam.click_function = bankFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(bTParam)
+            btnIndex = btnIndex+1
 
-        local withholdFuncName = k .. 'withholdTransfer'
-        local withholdFunc = function(object, color) buttonHelper(company, 'Withhold') end
-        Global.setVar(withholdFuncName, withholdFunc)
-        wParam.click_function = withholdFuncName
-        getObjectFromGUID(company.inputCounterGUID).createButton(wParam)
-        btnIndex = btnIndex+1
+            local withholdFuncName = k .. 'withholdTransfer'
+            local withholdFunc = function(object, color) buttonHelper(company, 'Withhold') end
+            Global.setVar(withholdFuncName, withholdFunc)
+            wParam.click_function = withholdFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(wParam)
+            btnIndex = btnIndex+1
+        end
     end
 end
 
@@ -331,7 +343,7 @@ function initPlayers()
 
         --okay
         player.key = k
-        if Player[k].seated then player.name = Player[k].steam_name else player.name = k end
+        if Player[k].seated then player.NAME = Player[k].steam_name else player.NAME = k end
         if SAVE_STATE['Player ' .. k] then
             player.treasury = SAVE_STATE['Player ' .. k]
         else
@@ -481,9 +493,9 @@ function transferMoneyWithBank(caller, amount, print, log)
         updateLabel(gameEntities.OTHER_ACTORS['BANK'])
     end
     if (amount > 0) then
-        logTransaction(amount, 'Bank', caller.name, print, log)
+        logTransaction(amount, 'Bank', caller.NAME, print, log)
     elseif (amount < 0) then
-        logTransaction(amount*-1, caller.name, 'Bank', print, log)
+        logTransaction(amount*-1, caller.NAME, 'Bank', print, log)
     end
 end
 
@@ -592,8 +604,8 @@ function Payout(caller, amount, color)
 end
 
 function transferPayouts(caller, payoutTable, amount)
-    printToAll("--- " .. caller.name .. " pays out " .. formatLabel(amount) .. " ---")
-    logTransaction(amount, 'Bank', caller.name .. ' Shares', false, true)
+    printToAll("--- " .. caller.NAME .. " pays out " .. formatLabel(amount) .. " ---")
+    logTransaction(amount, 'Bank', caller.NAME .. ' Shares', false, true)
 
     if caller.PROPORTIONAL_PAYOUTS then transferPropPayouts(caller, payoutTable, amount) return end
 
@@ -605,10 +617,10 @@ function transferPayouts(caller, payoutTable, amount)
             local string = ''
             if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
                 calc = math.ceil(amount*v[2]/100)
-                string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. '%.'
+                string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. '%.'
             else
                 calc = math.ceil(amount*v[2]/caller.issueSize)
-                string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
+                string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
             end
             transferMoneyWithBank(v[1], calc, false, false)
             printToAll(string)
@@ -638,7 +650,7 @@ function transferPropPayouts(caller, payoutTable, amount)
             else
                 calc = v[2]*perShare
             end
-            string = v[1].name .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2] .. '/' .. shareCount .. ')'
+            string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2] .. '/' .. shareCount .. ')'
             transferMoneyWithBank(v[1], calc, false, false)
             printToAll(string)
         end
@@ -712,7 +724,7 @@ function transferPrivatePayouts(payoutTable)
     for k,v in pairs(payoutTable) do
         if (v[2]~=0) then
             transferMoneyWithBank(v[1], v[2], false, false)
-            printToAll(v[1].name .. ' paid ' .. formatLabel(v[2]) .. ' for Privates')
+            printToAll(v[1].NAME .. ' paid ' .. formatLabel(v[2]) .. ' for Privates')
             someoneGotPaid = true
         end
     end
@@ -792,6 +804,7 @@ function logTransaction(amount, source, target, print, log)
 end
 
 function updateLabel(table_entry)
+    if not table_entry.moneyLabelGUID then return end
     local button_parameters = {}
     button_parameters.click_function = 'nilFunction'
     button_parameters.label = formatLabel(table_entry.treasury)
@@ -841,7 +854,7 @@ function roundTo(input, roundAmount, upDown)
 end
 
 function onPlayerChangeColor(color)
-    if gameEntities.PLAYERS[color] then gameEntities.PLAYERS[color].name = Player[color].steam_name end
+    if gameEntities.PLAYERS[color] then gameEntities.PLAYERS[color].NAME = Player[color].steam_name end
 end
 
 ---Hardcoded values---
