@@ -53,7 +53,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.2, copy and paste everything below this line to update!
+---VERSION 2.4, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -98,14 +98,17 @@ gameOptionDefaults = {
     COMPANIES_CAN_BANK_TRANSFER = true,
     -- If false, the script won't spawn buttons for "take money" and "spend money"
 
-    --NAME = 'name'
+    --NAME = 'name',
     --! Don't uncomment this, it's documentation. !
     --setting a company's NAME option will print that name in the logs instead of the table name.
+
+    COMPANIES_PAY_FLAT_RATE = false, --Each share earns the amount entered into the counter, instead of dividing the amount between them.
+    --If SHARE_DESCRIPTIONS_ARE_PERCENTAGE, then the amount entered is paid for each 10% the owner holds.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.2
+    versionNumber = 2.4
 }
 
 function onSave()
@@ -176,7 +179,8 @@ function initCompanies()
         end
 
         --check for a charter if one is required.
-        if ( (company.CHARTER_SHARES_PAY_COMPANY) or (company.COMPANIES_CAN_CROSS_INVEST) or (company.USE_PRIVATES and company.COMPANIES_CAN_OWN_PRIVATES) ) then
+        company.HAS_CHARTER = ( (company.CHARTER_SHARES_PAY_COMPANY) or (company.COMPANIES_CAN_CROSS_INVEST) or (company.USE_PRIVATES and company.COMPANIES_CAN_OWN_PRIVATES) )
+        if company.HAS_CHARTER then
             if not company.charterGUID then
                 broadcastToAll('ERROR: No "charterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
             end
@@ -514,6 +518,7 @@ function Payout(caller, amount, color)
     if caller.COMPANY_CHARTERS_ARE_SHARES then
         payoutTable[color] = {gameEntities.PLAYERS[color], 2}
     else
+
         --tabulate player shares
         for k,v in pairs(gameEntities.PLAYERS) do
             payoutTable[k] = {v, 0}
@@ -559,11 +564,12 @@ function Payout(caller, amount, color)
                 Global.setVar(callbackName, callbackFunc)
             end
 
+
         --tabulate shares on other companies
         if caller.COMPANIES_CAN_CROSS_INVEST then
 
             for k,v in pairs(gameEntities.COMPANIES) do
-                if k~=caller.key then
+                if k~=caller.key and v.HAS_CHARTER then
                     payoutTable[k] = {v,0}
                     waitFlags[k] = false
 
@@ -591,6 +597,7 @@ function Payout(caller, amount, color)
         end
 
     end
+
             Wait.condition(
             function()
                 transferPayouts(caller, payoutTable, amount)
@@ -609,6 +616,7 @@ function transferPayouts(caller, payoutTable, amount)
     logTransaction(amount, 'Bank', caller.NAME .. ' Shares', false, true)
 
     if caller.PROPORTIONAL_PAYOUTS then transferPropPayouts(caller, payoutTable, amount) return end
+    if caller.COMPANIES_PAY_FLAT_RATE then transferFlatPayouts(caller, payoutTable, amount) return end
 
     local someoneGotPaid = false
     for k,v in pairs(payoutTable) do
@@ -657,6 +665,27 @@ function transferPropPayouts(caller, payoutTable, amount)
         end
     end
     if not allOne then Withhold(caller, remainder) end
+end
+
+function transferFlatPayouts(caller, payoutTable, amount)
+    local someoneGotPaid = false
+        for k,v in pairs(payoutTable) do
+            if (v[2]~=0) then
+                someoneGotPaid = true
+                local calc = 0
+                local string = ''
+                if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
+                    calc = math.ceil(amount*v[2]/10)
+                    string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. '%.'
+                else
+                    calc = math.ceil(amount*v[2])
+                    string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares.'
+                end
+                transferMoneyWithBank(v[1], calc, false, false)
+                printToAll(string)
+            end
+        end
+        if not someoneGotPaid then broadcastToAll('No company or player was paid dividends. Make sure shares are in hand or on charters.') end
 end
 
 function payPrivates()
@@ -765,7 +794,6 @@ end
 
 function changeSize(company)
     company.issueIndex = incLoop(company.issueIndex,#company.ISSUE_SIZE)
-    --broadcastToAll(company.issueIndex .. " : " .. company.ISSUE_SIZE[company.issueIndex])
     company.issueSize = company.ISSUE_SIZE[company.issueIndex]
     if (type(company.HALF_PAY_ROUND) == 'table') then
         company.halfPayRound = company.HALF_PAY_ROUND[company.issueIndex]
