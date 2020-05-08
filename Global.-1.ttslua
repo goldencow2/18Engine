@@ -53,7 +53,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.4, copy and paste everything below this line to update!
+---VERSION 2.5, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -104,11 +104,13 @@ gameOptionDefaults = {
 
     COMPANIES_PAY_FLAT_RATE = false, --Each share earns the amount entered into the counter, instead of dividing the amount between them.
     --If SHARE_DESCRIPTIONS_ARE_PERCENTAGE, then the amount entered is paid for each 10% the owner holds.
+
+    HAND_SHARES_PAY_PLAYER = true, -- if set to false, shares and privates in the players hands will not pay money.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.4
+    versionNumber = 2.5
 }
 
 function onSave()
@@ -524,10 +526,37 @@ function Payout(caller, amount, color)
             payoutTable[k] = {v, 0}
             --if player has a designated zone, search that for shares matching this company
             if getObjectFromGUID(v.shareZoneGUID) then
-                payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), caller, payoutTable[k][2])
+                if getObjectFromGUID(v.shareZoneGUID).tag == 'Scripting' then
+                    payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), caller, payoutTable[k][2])
+                else
+
+                    waitFlags[k] = false
+
+                    --Dynamically spawn a scripting zone to on the charter
+                    local bb = getObjectFromGUID(v.shareZoneGUID).getBoundsNormalized()
+                    local params = {}
+                    local callbackName = "callbackPlayer" .. k
+                    params.position = getObjectFromGUID(v.shareZoneGUID).getPosition()
+                    params.rotation = getObjectFromGUID(v.shareZoneGUID).getRotation()
+                    params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
+                    params.callback = callbackName
+                    params.type = 'ScriptingTrigger'
+                    params.sound = false
+                    local zone = spawnObject(params)
+
+                    local callbackFunc = function()
+                        payoutTable[k][2] = searchContainer(zone.getObjects(), caller, payoutTable[k][2])
+                        waitFlags[k] = true
+                        zone.destruct()
+                    end
+                    Global.setVar(callbackName, callbackFunc)
+
+                end
             end
             --search the player's hand
-            payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
+            if caller.HAND_SHARES_PAY_PLAYER then
+                payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
+            end
         end
 
         --tabulate company shares
@@ -635,7 +664,7 @@ function transferPayouts(caller, payoutTable, amount)
             printToAll(string)
         end
     end
-    if not someoneGotPaid then broadcastToAll('No company or player was paid dividends. Make sure shares are in hand or on charters.') end
+    if not someoneGotPaid then broadcastToAll('No company or player was paid dividends. Make sure shares are where they should be.') end
 end
 
 function transferPropPayouts(caller, payoutTable, amount)
@@ -685,7 +714,7 @@ function transferFlatPayouts(caller, payoutTable, amount)
                 printToAll(string)
             end
         end
-        if not someoneGotPaid then broadcastToAll('No company or player was paid dividends. Make sure shares are in hand or on charters.') end
+        if not someoneGotPaid then broadcastToAll('No company or player was paid dividends. Make sure shares are where they should be.') end
 end
 
 function payPrivates()
@@ -702,10 +731,37 @@ function payPrivates()
         payoutTable[k] = {v, 0}
         --if player has a designated zone, search that for shares matching this company
         if getObjectFromGUID(v.shareZoneGUID) then
-            payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), fakeCaller, payoutTable[k][2])
+            if getObjectFromGUID(v.shareZoneGUID).tag == 'Scripting' then
+                payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), fakeCaller, payoutTable[k][2])
+            else
+
+                waitFlags[k] = false
+
+                --Dynamically spawn a scripting zone to on the charter
+                local bb = getObjectFromGUID(v.shareZoneGUID).getBoundsNormalized()
+                local params = {}
+                local callbackName = "callbackPlayer" .. k
+                params.position = getObjectFromGUID(v.shareZoneGUID).getPosition()
+                params.rotation = getObjectFromGUID(v.shareZoneGUID).getRotation()
+                params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
+                params.callback = callbackName
+                params.type = 'ScriptingTrigger'
+                params.sound = false
+                local zone = spawnObject(params)
+
+                local callbackFunc = function()
+                    payoutTable[k][2] = searchContainer(zone.getObjects(), fakeCaller, payoutTable[k][2])
+                    waitFlags[k] = true
+                    zone.destruct()
+                end
+                Global.setVar(callbackName, callbackFunc)
+
+            end
         end
         --search the player's hand
-        payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), fakeCaller, payoutTable[k][2])
+        if gameOptions.HAND_SHARES_PAY_PLAYER then
+            payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
+        end
     end
 
     --tabulate company privates
@@ -758,7 +814,7 @@ function transferPrivatePayouts(payoutTable)
             someoneGotPaid = true
         end
     end
-    if not someoneGotPaid then broadcastToAll('No company or player was paid revenue. Make sure private companies are in hand or on charters.') end
+    if not someoneGotPaid then broadcastToAll('No company or player was paid revenue. Make sure private companies are where they should be.') end
 end
 
 function searchContainer(container, caller, count)
