@@ -76,7 +76,7 @@ gameOptionDefaults = {
     COMPANIES_CAN_CROSS_INVEST = false, --Companies can own shares in other companies (the script will pay foreign shares on charters)
     SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false, --The number appended to a share's description is the % of the revenue it will receive e.g 'B&O20' = 20%, 'UdW5' = 5%
     USE_PRIVATES = false, --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
-    COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs (Note: not implemented yet)
+    COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs
 
     COMPANY_CHARTERS_ARE_SHARES = false, --The charter itself represents 1 share.
     --This will also set the company to assume only 1 share exists, and the player who presses the payout button will be paid for it.
