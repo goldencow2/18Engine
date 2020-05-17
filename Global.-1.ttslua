@@ -53,7 +53,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.5, copy and paste everything below this line to update!
+---VERSION 2.6, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -76,7 +76,7 @@ gameOptionDefaults = {
     COMPANIES_CAN_CROSS_INVEST = false, --Companies can own shares in other companies (the script will pay foreign shares on charters)
     SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false, --The number appended to a share's description is the % of the revenue it will receive e.g 'B&O20' = 20%, 'UdW5' = 5%
     USE_PRIVATES = false, --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
-    COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs
+    COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs (Note: not implemented yet)
 
     COMPANY_CHARTERS_ARE_SHARES = false, --The charter itself represents 1 share.
     --This will also set the company to assume only 1 share exists, and the player who presses the payout button will be paid for it.
@@ -110,7 +110,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.5
+    versionNumber = 2.6
 }
 
 function onSave()
@@ -145,6 +145,12 @@ function onload(saved_data)
     if saved_data~='' then
         SAVE_STATE = JSON.decode(saved_data)
     end
+
+    --necessary default crap due to privates copying code from companies.
+    if gameOptions.HAND_SHARES_PAY_PLAYER == nil then
+        gameOptions.HAND_SHARES_PAY_PLAYER = true
+    end
+
     initCompanies()
     initPlayers()
     initBank()
@@ -760,7 +766,7 @@ function payPrivates()
         end
         --search the player's hand
         if gameOptions.HAND_SHARES_PAY_PLAYER then
-            payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), caller, payoutTable[k][2])
+            payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), fakeCaller, payoutTable[k][2])
         end
     end
 
