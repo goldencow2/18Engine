@@ -1055,6 +1055,9 @@ function onObjectDrop(_, obj)
 
             --check if remaining string corresponds to a company.
             if gameEntities.COMPANIES[str] ~= nil then
+                --set the token to not sticky, so it doesn't lift other tokens with it when grabbed.
+                obj.sticky = false
+
                 --check is object was dropped within the revenue tracker.
                 local pos = obj.getPosition()
                 for _,b in ipairs(gameEntities.OTHER_ACTORS.REVENUE_TRACKER) do
