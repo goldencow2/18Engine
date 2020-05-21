@@ -186,8 +186,6 @@ function onload(saved_data)
     initIPO()
     initBankPool()
     initRevenue()
-
-    initNotebook()
 end
 
 function initCompanies()
