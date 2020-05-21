@@ -21,6 +21,23 @@ gameEntities = {
             ['PRIVATES'] = {
                 payPrivatesButtonGUID = ''
             },
+            --[[ --Remove this line to use revenue tracker. The values shown are examples.
+            ['REVENUE_TRACKER'] = {
+                {
+                    ['GUID']='d44a8e',
+                    ['ROWS']=1,
+                    ['COLS']=18,
+                    ['START']=3
+                },
+                {
+                    ['GUID']='b04649',
+                    ['ROWS']=5,
+                    ['COLS']=21,
+                    ['START']=21
+                },
+                --etc.
+            }
+            --]] --Remove this line to use revenue tracker. The values shown are examples.
 
     }, COMPANIES = {
             ['Example Company'] = {
@@ -106,6 +123,16 @@ gameOptionDefaults = {
     --If SHARE_DESCRIPTIONS_ARE_PERCENTAGE, then the amount entered is paid for each 10% the owner holds.
 
     HAND_SHARES_PAY_PLAYER = true, -- if set to false, shares and privates in the players hands will not pay money.
+
+    TRACK_ON_RIGHT_CLICK = true,
+    -- If true, right clicking payout/half-pay will move the corresponding revenue tracker.
+    -- If false, left clicking will move it and right clicking will not.
+
+    ADJUST_INPUT_BY_REVENUE = true, -- see documentation
+    TRACK_REVENUE_PER_SHARE = false,
+    --By default, the automatic revenue tracker assumes revenue is being tracker per-share.
+    --E.g, '18' for a 5-share company is a total revenue of $90 but '18' for a 10-share company is a total revenue of $180 and the input counter will be set appropriately.
+    --If this is set to true, then the set companies are tracked as if they were 10-shares regardless of size, e.g, placing the tracker down on '18' sets the input counter to $180.
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
@@ -158,6 +185,9 @@ function onload(saved_data)
     initLog()
     initIPO()
     initBankPool()
+    initRevenue()
+
+    initNotebook()
 end
 
 function initCompanies()
@@ -265,38 +295,56 @@ function initCompanies()
 
         --fucking LUA wizardry
         --Using a locally defined function as the click_function allows us to access the other local variables in this for loop
-        local bTParam = bankTransferParams
-        local wParam = withholdParams
-        local pFParam = payFullParams
-        local pHParam = payHalfParams
 
         local btnIndex = 0
+        local fullPayIndex = nil
+        local halfPayIndex = nil
         --increment as buttons are created, because createButton doesn't return the button's index for some fucking reason.
         --button indexes also start at zero because convention sucks.
 
         if company.COMPANIES_CAN_HALF_PAY then
             local payFuncName = k .. 'PayHalf'
-            local payFunc = function(object, color) buttonHelper(company, 'PayHalf', color) end
+            local payFunc = function(object, color, alt) buttonHelper(company, 'PayHalf', color, alt) end
             Global.setVar(payFuncName, payFunc)
-            pHParam.click_function = payFuncName
-            getObjectFromGUID(company.inputCounterGUID).createButton(pHParam)
+            payHalfParams.click_function = payFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(payHalfParams)
+            halfPayIndex = btnIndex
             btnIndex = btnIndex+1
         end
 
         if company.COMPANIES_CAN_FULL_PAY then
             local payFuncName = k .. 'Payout'
-            local payFunc = function(object, color) buttonHelper(company, 'Payout', color) end
+            local payFunc = function(object, color, alt) buttonHelper(company, 'Payout', color, alt) end
             Global.setVar(payFuncName, payFunc)
-            pFParam.click_function = payFuncName
-            getObjectFromGUID(company.inputCounterGUID).createButton(pFParam)
+            payFullParams.click_function = payFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(payFullParams)
+            fullPayIndex = btnIndex
             btnIndex = btnIndex+1
         end
 
         if company.COMPANIES_CAN_HALF_PAY and company.COMPANIES_CAN_FULL_PAY then
-            getObjectFromGUID(company.inputCounterGUID).editButton({index=0, position = addv(pHParam.position,{0,0,-0.2})})
-            getObjectFromGUID(company.inputCounterGUID).editButton({index=1, label='Pay Full', position = addv(pFParam.position,{0,0,0.2})})
+            getObjectFromGUID(company.inputCounterGUID).editButton({index=halfPayIndex, position = addv(payHalfParams.position,{0,0,-0.2})})
+            getObjectFromGUID(company.inputCounterGUID).editButton({index=fullPayIndex, label='Pay Full', position = addv(payFullParams.position,{0,0,0.2})})
         end
 
+        if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
+            --set payout tooltips
+            if company.COMPANIES_CAN_FULL_PAY then
+                if company.TRACK_ON_RIGHT_CLICK then
+                    getObjectFromGUID(company.inputCounterGUID).editButton({index=fullPayIndex, tooltip='Right-click this button to track revenue.'})
+                else
+                    getObjectFromGUID(company.inputCounterGUID).editButton({index=fullPayIndex, tooltip='Right-click this button to [i]not[/i] track revenue.'})
+                end
+            end
+
+            if company.COMPANIES_CAN_HALF_PAY then
+                if company.TRACK_ON_RIGHT_CLICK then
+                    getObjectFromGUID(company.inputCounterGUID).editButton({index=halfPayIndex, tooltip='Right-click this button to track revenue.'})
+                else
+                    getObjectFromGUID(company.inputCounterGUID).editButton({index=halfPayIndex, tooltip='Right-click this button to [i]not[/i] track revenue.'})
+                end
+            end
+        end
 
         if (type(company.ISSUE_SIZE) == 'table') then
             local changeSizeFuncName = k .. 'changeSize'
@@ -313,15 +361,15 @@ function initCompanies()
             local bankFuncName = k .. 'bankTransfer'
             local bankFunc = function(object, color) buttonHelper(company, 'Bank Transfer') end
             Global.setVar(bankFuncName, bankFunc)
-            bTParam.click_function = bankFuncName
-            getObjectFromGUID(company.inputCounterGUID).createButton(bTParam)
+            bankTransferParams.click_function = bankFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(bankTransferParams)
             btnIndex = btnIndex+1
 
             local withholdFuncName = k .. 'withholdTransfer'
             local withholdFunc = function(object, color) buttonHelper(company, 'Withhold') end
             Global.setVar(withholdFuncName, withholdFunc)
-            wParam.click_function = withholdFuncName
-            getObjectFromGUID(company.inputCounterGUID).createButton(wParam)
+            withholdParams.click_function = withholdFuncName
+            getObjectFromGUID(company.inputCounterGUID).createButton(withholdParams)
             btnIndex = btnIndex+1
         end
     end
@@ -479,7 +527,29 @@ function initLog()
     end
 end
 
-function buttonHelper(caller, type, color)
+function initRevenue()
+    if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
+        for _,b in ipairs(gameEntities.OTHER_ACTORS.REVENUE_TRACKER) do
+            local box = getObjectFromGUID(b.GUID)
+            if box then
+                b.valid = true
+
+                local s = box.getScale()
+                local s2 = Vector(-s.x/2,-s.y/2,s.z/2)
+                b.upperleft = box.getPosition()+s2
+                s2 = Vector(s.x/2,-s.y/2,-s.z/2)
+                b.lowerright = box.getPosition()+s2
+                b.width= b.lowerright.x-b.upperleft.x
+                b.height = b.upperleft.z-b.lowerright.z
+                b.cellWidth = b.width / b.COLS
+                b.cellHeight = b.height / b.ROWS
+                b.maxValue = b.START + b.COLS*b.ROWS - 1
+            end
+        end
+    end
+end
+
+function buttonHelper(caller, type, color, alt)
     local amount = getObjectFromGUID(caller.inputCounterGUID).getValue()
     if amount == 0 then return end
     if type == 'Bank Transfer' then
@@ -493,6 +563,29 @@ function buttonHelper(caller, type, color)
         printToAll('')
         Payout(caller, roundTo(amount/2, caller.halfPayRound, true), color)
         Withhold(caller, roundTo(amount/2, caller.halfPayRound, false), color)
+    end
+
+    --move revenue tracker
+    if gameEntities.OTHER_ACTORS.REVENUE_TRACKER and alt~=nil then
+        if not caller.TRACK_ON_RIGHT_CLICK then alt = not alt end
+        if alt then
+            --find appropriate box
+            local num = 0
+            if caller.TRACK_REVENUE_PER_SHARE then num = amount/caller.issueSize else num = amount/10 end
+            for _,b in ipairs(gameEntities.OTHER_ACTORS.REVENUE_TRACKER) do
+                if num>=b.START and num<=b.maxValue then
+                    local xcell = (num-b.START) % (b.COLS)
+                    local zcell = math.floor((num-b.START) / b.COLS)
+                    local obj = getObjectFromGUID(caller['revenueTrackerGUID'])
+                    if (obj) then
+                        obj.setPositionSmooth({b.upperleft.x + b.cellWidth*(xcell+0.5), obj.getPosition().y+1, b.upperleft.z - b.cellHeight*(zcell+0.5)}, false, true)
+                    else
+                        broadcastToColor("Automatic tracking requires the first value to be placed manually.", color, 'Red')
+                    end
+                    break
+                end
+            end
+        end
     end
 end
 
@@ -946,6 +1039,55 @@ end
 
 function onPlayerChangeColor(color)
     if gameEntities.PLAYERS[color] then gameEntities.PLAYERS[color].NAME = Player[color].steam_name end
+end
+
+-- event functions ---
+
+function onObjectDrop(_, obj)
+    if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
+        if (string.find(obj.getDescription(), "Revenue")) then
+            local str = obj.getDescription()
+
+            --I don't know anything about string functions, this should remove the word "revenue" and any excess spaces
+            --But leave the spaces within the company name alone.
+            --Unless user put a company name that has spaces, like, at the end of it e.g., 'B&O    ' but then the user is a moron so screw them.
+            str = string.gsub(str, "^%s*(.-)%s*$", "%1")
+            str = string.sub(str,1,-8)
+            str = string.gsub(str, "^%s*(.-)%s*$", "%1")
+
+            --check if remaining string corresponds to a company.
+            if gameEntities.COMPANIES[str] ~= nil then
+                --check is object was dropped within the revenue tracker.
+                local pos = obj.getPosition()
+                for _,b in ipairs(gameEntities.OTHER_ACTORS.REVENUE_TRACKER) do
+                    if b.valid then
+                        if pos.x >= b.upperleft.x and pos.x<= b.lowerright.x and pos.z <= b.upperleft.z and pos.z >= b.lowerright.z then
+                            --find x-cell
+                            local xcell = math.floor( (math.abs(pos.x-b.upperleft.x)/b.width)*b.COLS )
+                            local zcell = math.floor( (math.abs(pos.z-b.upperleft.z)/b.height)*b.ROWS )
+
+                            --snap to grid
+                            obj.setPositionSmooth({b.upperleft.x + b.cellWidth*(xcell+0.5), pos.y, b.upperleft.z - b.cellHeight*(zcell+0.5)}, false, true)
+
+                            --set counter based on grid position
+                            local company = gameEntities.COMPANIES[str]
+                            company['revenueTrackerGUID'] = obj.getGUID()
+                            local input = getObjectFromGUID(company.inputCounterGUID)
+
+                            local val = b.START + xcell + b.COLS*zcell
+                            if company.ADJUST_INPUT_BY_REVENUE then
+                                if company.TRACK_REVENUE_PER_SHARE then
+                                    input.setValue(val*company.issueSize)
+                                else
+                                    input.setValue(val*10)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 ---Hardcoded values---
