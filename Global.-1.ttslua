@@ -23,18 +23,8 @@ gameEntities = {
             },
             --[[ --Remove this line to use revenue tracker. The values shown are examples.
             ['REVENUE_TRACKER'] = {
-                {
-                    ['GUID']='d44a8e',
-                    ['ROWS']=1,
-                    ['COLS']=18,
-                    ['START']=3
-                },
-                {
-                    ['GUID']='b04649',
-                    ['ROWS']=5,
-                    ['COLS']=21,
-                    ['START']=21
-                },
+                {['GUID']='ff23a4', ['ROWS']=2, ['COLS']=32, ['START']=1},
+                {['GUID']='4b7ea7', ['ROWS']=1, ['COLS']=36, ['START']=65},
                 --etc.
             }
             --]] --Remove this line to use revenue tracker. The values shown are examples.
@@ -124,11 +114,14 @@ gameOptionDefaults = {
 
     HAND_SHARES_PAY_PLAYER = true, -- if set to false, shares and privates in the players hands will not pay money.
 
+    TRACK_REVENUE = true, --If true, companies will automatically track revenue.
+    ADJUST_INPUT_BY_REVENUE = true, -- If true, companies will adjust their input counters automatically when a revenue marker is placed.
+    --Both options are ignored if the revenue tracker isn't being used (see documentation).
+
     TRACK_ON_RIGHT_CLICK = true,
     -- If true, right clicking payout/half-pay will move the corresponding revenue tracker.
     -- If false, left clicking will move it and right clicking will not.
 
-    ADJUST_INPUT_BY_REVENUE = true, -- see documentation
     TRACK_REVENUE_PER_SHARE = false,
     --By default, the automatic revenue tracker assumes revenue is being tracker per-share.
     --E.g, '18' for a 5-share company is a total revenue of $90 but '18' for a 10-share company is a total revenue of $180 and the input counter will be set appropriately.
@@ -325,7 +318,7 @@ function initCompanies()
             getObjectFromGUID(company.inputCounterGUID).editButton({index=fullPayIndex, label='Pay Full', position = addv(payFullParams.position,{0,0,0.2})})
         end
 
-        if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
+        if gameEntities.OTHER_ACTORS.REVENUE_TRACKER and company.TRACK_REVENUE then
             --set payout tooltips
             if company.COMPANIES_CAN_FULL_PAY then
                 if company.TRACK_ON_RIGHT_CLICK then
@@ -564,7 +557,7 @@ function buttonHelper(caller, type, color, alt)
     end
 
     --move revenue tracker
-    if gameEntities.OTHER_ACTORS.REVENUE_TRACKER and alt~=nil then
+    if gameEntities.OTHER_ACTORS.REVENUE_TRACKER and caller.TRACK_REVENUE and alt~=nil then
         if not caller.TRACK_ON_RIGHT_CLICK then alt = not alt end
         if alt then
             --find appropriate box
