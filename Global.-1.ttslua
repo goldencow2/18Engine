@@ -1036,7 +1036,7 @@ end
 
 function onObjectDrop(_, obj)
     if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
-        if (string.find(obj.getDescription(), "Revenue")) then
+        if (string.find(obj.getDescription(), "Revenue")) or (string.find(obj.getDescription(), "revenue")) then
             local str = obj.getDescription()
 
             --I don't know anything about string functions, this should remove the word "revenue" and any excess spaces
