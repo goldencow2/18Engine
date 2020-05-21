@@ -26,7 +26,7 @@ gameEntities = {
                 {['GUID']='ff23a4', ['ROWS']=2, ['COLS']=32, ['START']=1},
                 {['GUID']='4b7ea7', ['ROWS']=1, ['COLS']=36, ['START']=65},
                 --etc.
-            }
+            },
             --]] --Remove this line to use revenue tracker. The values shown are examples.
 
     }, COMPANIES = {
