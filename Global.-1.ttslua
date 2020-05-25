@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.62, copy and paste everything below this line to update!
+---VERSION 2.63, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -130,7 +130,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.62
+    versionNumber = 2.63
 }
 
 function onSave()
@@ -534,7 +534,10 @@ function initRevenue()
                 b.height = b.upperleft.z-b.lowerright.z
                 b.cellWidth = b.width / b.COLS
                 b.cellHeight = b.height / b.ROWS
-                b.maxValue = b.START + b.COLS*b.ROWS - 1
+
+                if not b.VERTICAL_INC then b.VERTICAL_INC = b.COLS end
+
+                b.maxValue = b.START + b.COLS-1 + b.VERTICAL_INC * (b.ROWS-1)
             end
         end
     end
@@ -562,11 +565,11 @@ function buttonHelper(caller, type, color, alt)
         if alt then
             --find appropriate box
             local num = 0
-            if caller.TRACK_REVENUE_PER_SHARE then num = amount/caller.issueSize else num = amount/10 end
+            if caller.TRACK_REVENUE_PER_SHARE then num = math.floor(amount/caller.issueSize) else num = amount/10 end
             for _,b in ipairs(gameEntities.OTHER_ACTORS.REVENUE_TRACKER) do
-                if num>=b.START and num<=b.maxValue then
-                    local xcell = (num-b.START) % (b.COLS)
-                    local zcell = math.floor((num-b.START) / b.COLS)
+                if num>=b.START and num<=b.maxValue and (num-b.START)%b.VERTICAL_INC>=0 and (num-b.START)%b.VERTICAL_INC<=b.COLS-1 then
+                    local xcell = (num-b.START) % (b.VERTICAL_INC)
+                    local zcell = math.floor((num-b.START) / b.VERTICAL_INC)
                     local obj = getObjectFromGUID(caller['revenueTrackerGUID'])
                     if (obj) then
                         obj.setPositionSmooth({b.upperleft.x + b.cellWidth*(xcell+0.5), obj.getPosition().y+1, b.upperleft.z - b.cellHeight*(zcell+0.5)}, false, true)
@@ -1036,7 +1039,7 @@ end
 
 function onObjectDrop(_, obj)
     if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
-        if (string.find(obj.getDescription(), "Revenue")) or (string.find(obj.getDescription(), "revenue")) then
+        if (string.find(obj.getDescription(), "Revenue")) or (string.find(obj.getDescription(), "revenue")) or (string.find(obj.getDescription(), "REVENUE")) then
             local str = obj.getDescription()
 
             --I don't know anything about string functions, this should remove the word "revenue" and any excess spaces
@@ -1068,7 +1071,7 @@ function onObjectDrop(_, obj)
                             company['revenueTrackerGUID'] = obj.getGUID()
                             local input = getObjectFromGUID(company.inputCounterGUID)
 
-                            local val = b.START + xcell + b.COLS*zcell
+                            local val = b.START + xcell + b.VERTICAL_INC*zcell
                             if company.ADJUST_INPUT_BY_REVENUE then
                                 if company.TRACK_REVENUE_PER_SHARE then
                                     input.setValue(val*company.issueSize)
