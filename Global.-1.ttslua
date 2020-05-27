@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.63, copy and paste everything below this line to update!
+---VERSION 2.7, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -80,7 +80,15 @@ gameOptionDefaults = {
     IPO_SHARES_PAY_COMPANY = false,
     IPO_ZONE_GUID = nil,
     CHARTER_SHARES_PAY_COMPANY = false,
-    COMPANIES_CAN_CROSS_INVEST = false, --Companies can own shares in other companies (the script will pay foreign shares on charters)
+
+    COMPANIES_CAN_CROSS_INVEST = false,
+    COMPANY_CAN_OWN_OTHER_SHARES = true,
+    --Bad wording, kept for backwards compatibility.
+    --If COMPANIES_CAN_CROSS_INVEST is set to true for Company A, then Companies B, C, D, etc. can own shares in Company A.
+    --If COMPANY_CAN_OWN_OTHER_SHARES is set to true for Company A, then Company A can own shares in Companies B, C, D, etc. but only if COMPANIES_CAN_CROSS_INVEST is set to true for those companies.
+    --If all companies can own shares in all companies, then just set COMPANIES_CAN_CROSS_INVEST to true in global and you're done.
+    --If a single company can own shares in any company then set COMPANIES_CAN_CROSS_INVEST to true in global, COMPANY_CAN_OWN_OTHER_SHARES to false in global, and COMPANY_CAN_OWN_OTHER_SHARES to true for that one company.
+
     SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false, --The number appended to a share's description is the % of the revenue it will receive e.g 'B&O20' = 20%, 'UdW5' = 5%
     USE_PRIVATES = false, --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
     COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs (Note: not implemented yet)
@@ -130,7 +138,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.63
+    versionNumber = 2.7
 }
 
 function onSave()
@@ -688,10 +696,10 @@ function Payout(caller, amount, color)
 
 
         --tabulate shares on other companies
-        if caller.COMPANIES_CAN_CROSS_INVEST then
 
+        if caller.COMPANIES_CAN_CROSS_INVEST then
             for k,v in pairs(gameEntities.COMPANIES) do
-                if k~=caller.key and v.HAS_CHARTER then
+                if k~=caller.key and v.COMPANY_CAN_OWN_OTHER_SHARES and v.HAS_CHARTER then
                     payoutTable[k] = {v,0}
                     waitFlags[k] = false
 
@@ -701,7 +709,7 @@ function Payout(caller, amount, color)
                     local callbackName = "callback" .. k
                     params.position = getObjectFromGUID(v.charterGUID).getPosition()
                     params.rotation = getObjectFromGUID(v.charterGUID).getRotation()
-                    params.scale = { bb.size.x, bb.size.y+2, bb.size.z }
+                    params.scale = { bb.size.x, bb.size.y+5, bb.size.z }
                     params.callback = callbackName
                     params.type = 'ScriptingTrigger'
                     params.sound = false
@@ -715,7 +723,6 @@ function Payout(caller, amount, color)
                     Global.setVar(callbackName, callbackFunc)
                 end
             end
-
         end
 
     end
