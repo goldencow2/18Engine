@@ -639,7 +639,7 @@ function Payout(caller, amount, color)
                     local callbackName = "callbackPlayer" .. k
                     params.position = getObjectFromGUID(v.shareZoneGUID).getPosition()
                     params.rotation = getObjectFromGUID(v.shareZoneGUID).getRotation()
-                    params.scale = { bb.size.x, bb.size.y+6, bb.size.z }
+                    params.scale = { bb.size.x, bb.size.y+8, bb.size.z }
                     params.callback = callbackName
                     params.type = 'ScriptingTrigger'
                     params.sound = false
@@ -680,7 +680,7 @@ function Payout(caller, amount, color)
                 local callbackName = "callback" .. caller.key
                 params.position = getObjectFromGUID(caller.charterGUID).getPosition()
                 params.rotation = getObjectFromGUID(caller.charterGUID).getRotation()
-                params.scale = { bb.size.x, bb.size.y+6, bb.size.z }
+                params.scale = { bb.size.x, bb.size.y+8, bb.size.z }
                 params.callback = callbackName
                 params.type = 'ScriptingTrigger'
                 params.sound = false
@@ -709,7 +709,7 @@ function Payout(caller, amount, color)
                     local callbackName = "callback" .. k
                     params.position = getObjectFromGUID(v.charterGUID).getPosition()
                     params.rotation = getObjectFromGUID(v.charterGUID).getRotation()
-                    params.scale = { bb.size.x, bb.size.y+6, bb.size.z }
+                    params.scale = { bb.size.x, bb.size.y+8, bb.size.z }
                     params.callback = callbackName
                     params.type = 'ScriptingTrigger'
                     params.sound = false
@@ -843,7 +843,7 @@ function payPrivates()
                 local callbackName = "callbackPlayer" .. k
                 params.position = getObjectFromGUID(v.shareZoneGUID).getPosition()
                 params.rotation = getObjectFromGUID(v.shareZoneGUID).getRotation()
-                params.scale = { bb.size.x, bb.size.y+6, bb.size.z }
+                params.scale = { bb.size.x, bb.size.y+8, bb.size.z }
                 params.callback = callbackName
                 params.type = 'ScriptingTrigger'
                 params.sound = false
@@ -876,7 +876,7 @@ function payPrivates()
             local callbackName = "callback" .. k .. "private"
             params.position = getObjectFromGUID(v.charterGUID).getPosition()
             params.rotation = getObjectFromGUID(v.charterGUID).getRotation()
-            params.scale = { bb.size.x, bb.size.y+6, bb.size.z }
+            params.scale = { bb.size.x, bb.size.y+8, bb.size.z }
             params.callback = callbackName
             params.type = 'ScriptingTrigger'
             params.sound = false
