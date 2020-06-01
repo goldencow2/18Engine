@@ -929,6 +929,11 @@ function searchContainer(container, caller, count)
                 for j,k in ipairs(o.getObjects()) do
                     count = addShare(k.description,caller,count)
                 end
+            else
+                local oldcount = count
+                count = addShare(o.getDescription(),caller,count)
+                local shareAmount = (count-oldcount)*o.getQuantity()
+                count = oldcount+shareAmount
             end
         end
     end
