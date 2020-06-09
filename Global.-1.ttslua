@@ -91,7 +91,7 @@ gameOptionDefaults = {
 
     SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false, --The number appended to a share's description is the % of the revenue it will receive e.g 'B&O20' = 20%, 'UdW5' = 5%
     USE_PRIVATES = false, --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
-    COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs (Note: not implemented yet)
+    COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs
 
     COMPANY_CHARTERS_ARE_SHARES = false, --The charter itself represents 1 share.
     --This will also set the company to assume only 1 share exists, and the player who presses the payout button will be paid for it.
@@ -134,6 +134,8 @@ gameOptionDefaults = {
     --By default, the automatic revenue tracker assumes revenue is being tracker per-share.
     --E.g, '18' for a 5-share company is a total revenue of $90 but '18' for a 10-share company is a total revenue of $180 and the input counter will be set appropriately.
     --If this is set to true, then the set companies are tracked as if they were 10-shares regardless of size, e.g, placing the tracker down on '18' sets the input counter to $180.
+
+    PRIVATES_USE_GM_NOTES = false, --If set to true, the script will look for the 'Private#' string in the GM Notes field (change your color to black and right click the object)
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
@@ -820,6 +822,7 @@ end
 function payPrivates()
     local fakeCaller = {} --hacky shit so I can use the share search function on privates
     fakeCaller.shareDescription = 'Private'
+    fakeCaller.PRIVATES_USE_GM_NOTES = gameOptions.PRIVATES_USE_GM_NOTES
 
     local payoutTable = {}
     --Part of this function spawns ScriptingZones, which take more than one frame to load.
@@ -918,6 +921,8 @@ function transferPrivatePayouts(payoutTable)
 end
 
 function searchContainer(container, caller, count)
+    if caller.PRIVATES_USE_GM_NOTES then return searchContainerGM(container, caller, count) end
+
     --this only works if container is a literal list of object values
     for i,o in ipairs(container) do
         if o.getQuantity() == -1 then
@@ -929,11 +934,25 @@ function searchContainer(container, caller, count)
                 for j,k in ipairs(o.getObjects()) do
                     count = addShare(k.description,caller,count)
                 end
-            else
-                local oldcount = count
-                count = addShare(o.getDescription(),caller,count)
-                local shareAmount = (count-oldcount)*o.getQuantity()
-                count = oldcount+shareAmount
+            end
+        end
+    end
+    return count
+end
+
+function searchContainerGM(container, caller, count)
+    --same as above but with GM notes
+    --this only works if container is a literal list of object values
+    for i,o in ipairs(container) do
+        if o.getQuantity() == -1 then
+            --object is a singleton
+            count = addShare(o.getGMNotes(),caller,count)
+        else
+            --object is a deck, or maybe not because getQuanity works for stacks but getObjects does not.
+            if o.tag=='Deck' then
+                for j,k in ipairs(o.getObjects()) do
+                    count = addShare(k.gm_notes,caller,count)
+                end
             end
         end
     end
