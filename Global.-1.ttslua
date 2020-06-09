@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.7, copy and paste everything below this line to update!
+---VERSION 2.8, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -140,7 +140,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.7
+    versionNumber = 2.8
 }
 
 function onSave()
