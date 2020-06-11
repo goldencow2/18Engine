@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.8, copy and paste everything below this line to update!
+---VERSION 2.82, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -140,7 +140,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.8
+    versionNumber = 2.82
 }
 
 function onSave()
@@ -822,7 +822,7 @@ end
 function payPrivates()
     local fakeCaller = {} --hacky shit so I can use the share search function on privates
     fakeCaller.shareDescription = 'Private'
-    fakeCaller.PRIVATES_USE_GM_NOTES = gameOptions.PRIVATES_USE_GM_NOTES
+    local use_gm = gameOptions.PRIVATES_USE_GM_NOTES
 
     local payoutTable = {}
     --Part of this function spawns ScriptingZones, which take more than one frame to load.
@@ -835,7 +835,7 @@ function payPrivates()
         --if player has a designated zone, search that for shares matching this company
         if getObjectFromGUID(v.shareZoneGUID) then
             if getObjectFromGUID(v.shareZoneGUID).tag == 'Scripting' then
-                payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), fakeCaller, payoutTable[k][2])
+                payoutTable[k][2] = searchContainer(getObjectFromGUID(v.shareZoneGUID).getObjects(), fakeCaller, payoutTable[k][2], use_gm)
             else
 
                 waitFlags[k] = false
@@ -853,7 +853,7 @@ function payPrivates()
                 local zone = spawnObject(params)
 
                 local callbackFunc = function()
-                    payoutTable[k][2] = searchContainer(zone.getObjects(), fakeCaller, payoutTable[k][2])
+                    payoutTable[k][2] = searchContainer(zone.getObjects(), fakeCaller, payoutTable[k][2], use_gm)
                     waitFlags[k] = true
                     zone.destruct()
                 end
@@ -863,7 +863,7 @@ function payPrivates()
         end
         --search the player's hand
         if gameOptions.HAND_SHARES_PAY_PLAYER then
-            payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), fakeCaller, payoutTable[k][2])
+            payoutTable[k][2] = searchContainer(Player[k].getHandObjects(), fakeCaller, payoutTable[k][2], use_gm)
         end
     end
 
@@ -886,7 +886,7 @@ function payPrivates()
             local zone = spawnObject(params)
 
             local callbackFunc = function()
-                payoutTable[k][2] = searchContainer(zone.getObjects(), fakeCaller, payoutTable[k][2])
+                payoutTable[k][2] = searchContainer(zone.getObjects(), fakeCaller, payoutTable[k][2], use_gm)
                 waitFlags[k] = true
                 zone.destruct()
             end
@@ -920,8 +920,8 @@ function transferPrivatePayouts(payoutTable)
     if not someoneGotPaid then broadcastToAll('No company or player was paid revenue. Make sure private companies are where they should be.') end
 end
 
-function searchContainer(container, caller, count)
-    if caller.PRIVATES_USE_GM_NOTES then return searchContainerGM(container, caller, count) end
+function searchContainer(container, caller, count, gm)
+    if gm then return searchContainerGM(container, caller, count) end
 
     --this only works if container is a literal list of object values
     for i,o in ipairs(container) do
