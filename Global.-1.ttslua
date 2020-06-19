@@ -140,7 +140,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.82
+    versionNumber = 2.83
 }
 
 function onSave()
