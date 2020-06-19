@@ -218,7 +218,7 @@ function initCompanies()
         end
 
         --check for a charter if one is required.
-        company.HAS_CHARTER = ( (company.CHARTER_SHARES_PAY_COMPANY) or (company.COMPANIES_CAN_CROSS_INVEST) or (company.USE_PRIVATES and company.COMPANIES_CAN_OWN_PRIVATES) )
+        company.HAS_CHARTER = ( (company.CHARTER_SHARES_PAY_COMPANY) or (company.COMPANIES_CAN_CROSS_INVEST and company.COMPANIES_CAN_OWN_OTHER_SHARES) or (company.USE_PRIVATES and company.COMPANIES_CAN_OWN_PRIVATES) )
         if company.HAS_CHARTER then
             if not company.charterGUID then
                 broadcastToAll('ERROR: No "charterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
@@ -869,7 +869,7 @@ function payPrivates()
 
     --tabulate company privates
     for k,v in pairs(gameEntities.COMPANIES) do
-        if v.COMPANIES_CAN_OWN_PRIVATES then
+        if v.COMPANIES_CAN_OWN_PRIVATES and v.USE_PRIVATES then
             payoutTable[k] = {v,0}
             waitFlags[k] = false
 
@@ -1014,6 +1014,7 @@ end
 
 function updateLabel(table_entry)
     if not table_entry.moneyLabelGUID then return end
+    local label = getObjectFromGUID(table_entry.moneyLabelGUID)
     local button_parameters = {}
     button_parameters.click_function = 'nilFunction'
     button_parameters.label = formatLabel(table_entry.treasury)
@@ -1022,6 +1023,9 @@ function updateLabel(table_entry)
     button_parameters.width = 0
     button_parameters.height = 0
     button_parameters.font_size = 700
+    local s = label.getScale()
+    local larger = math.max(s.x,s.z)
+    button_parameters.scale = {larger/s.x,1,larger/s.z}
     getObjectFromGUID(table_entry.moneyLabelGUID).clearButtons()
     getObjectFromGUID(table_entry.moneyLabelGUID).createButton(button_parameters)
 end
@@ -1070,6 +1074,7 @@ end
 
 function onObjectDrop(_, obj)
     if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
+        if #obj.getDescription() > 30 then return end
         if (string.find(obj.getDescription(), "Revenue")) or (string.find(obj.getDescription(), "revenue")) or (string.find(obj.getDescription(), "REVENUE")) then
             local str = obj.getDescription()
 
