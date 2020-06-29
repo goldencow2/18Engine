@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.82, copy and paste everything below this line to update!
+---VERSION 2.84, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -140,7 +140,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.83
+    versionNumber = 2.84
 }
 
 function onSave()
@@ -565,8 +565,13 @@ function buttonHelper(caller, type, color, alt)
         Withhold(caller, amount)
     elseif type == 'PayHalf' then
         printToAll('')
-        Payout(caller, roundTo(amount/2, caller.halfPayRound, true), color)
-        Withhold(caller, roundTo(amount/2, caller.halfPayRound, false), color)
+        if (amount > 0) then
+            Payout(caller, roundTo(amount/2, caller.halfPayRound, true), color)
+            Withhold(caller, roundTo(amount/2, caller.halfPayRound, false), color)
+        else
+            Payout(caller, roundTo(amount/2, caller.halfPayRound, false), color)
+            Withhold(caller, roundTo(amount/2, caller.halfPayRound, true), color)
+        end
     end
 
     --move revenue tracker
