@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.85, copy and paste everything below this line to update!
+---VERSION 2.86, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -90,7 +90,7 @@ gameOptionDefaults = {
     --If a single company can own shares in any company then set COMPANIES_CAN_CROSS_INVEST to true in global, COMPANIES_CAN_OWN_OTHER_SHARES to false in global, and COMPANIES_CAN_OWN_OTHER_SHARES to true for that one company.
 
     SHARE_DESCRIPTIONS_ARE_PERCENTAGE = false, --The number appended to a share's description is the % of the revenue it will receive e.g 'B&O20' = 20%, 'UdW5' = 5%
-    USE_PRIVATES = false, --If set to true, script excpects you to supply a GUID for an object to stick a "pay privates" button on.
+    USE_PRIVATES = false, --If set to true, script expects you to supply a GUID for an object to stick a "pay privates" button on.
     COMPANIES_CAN_OWN_PRIVATES = true, --if set to false, the script won't ask you to supply charter GUIDs
 
     COMPANY_CHARTERS_ARE_SHARES = false, --The charter itself represents 1 share.
@@ -181,6 +181,8 @@ function onload(saved_data)
         gameOptions.HAND_SHARES_PAY_PLAYER = true
     end
 
+    INVESTABLE_COMPANY_EXISTS = checkInvest()
+
     initCompanies()
     initPlayers()
     initBank()
@@ -218,7 +220,7 @@ function initCompanies()
         end
 
         --check for a charter if one is required.
-        company.HAS_CHARTER = ( (company.CHARTER_SHARES_PAY_COMPANY) or (company.COMPANIES_CAN_CROSS_INVEST and company.COMPANIES_CAN_OWN_OTHER_SHARES) or (company.USE_PRIVATES and company.COMPANIES_CAN_OWN_PRIVATES) )
+        company.HAS_CHARTER = ( (company.CHARTER_SHARES_PAY_COMPANY) or (company.COMPANIES_CAN_OWN_OTHER_SHARES and INVESTABLE_COMPANY_EXISTS) or (company.USE_PRIVATES and company.COMPANIES_CAN_OWN_PRIVATES) )
         if company.HAS_CHARTER then
             if not company.charterGUID then
                 broadcastToAll('ERROR: No "charterGUID" entry was found for the ' .. k .. ' Company', ERROR_COLOR) return
@@ -1071,11 +1073,19 @@ function roundTo(input, roundAmount, upDown)
     end
 end
 
-function onPlayerChangeColor(color)
-    if gameEntities.PLAYERS[color] then gameEntities.PLAYERS[color].NAME = Player[color].steam_name end
+function checkInvest()
+    --returns true if any company has COMPANIES_CAN_CROSS_INVEST set.
+    local ret = false
+    for k,v in pairs(gameEntities.COMPANIES) do
+        if v.COMPANIES_CAN_CROSS_INVEST then ret = true end
+    end
+    return ret
 end
 
 -- event functions ---
+function onPlayerChangeColor(color)
+    if gameEntities.PLAYERS[color] then gameEntities.PLAYERS[color].NAME = Player[color].steam_name end
+end
 
 function onObjectDrop(_, obj)
     if gameEntities.OTHER_ACTORS.REVENUE_TRACKER then
