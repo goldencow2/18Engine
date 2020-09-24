@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.86, copy and paste everything below this line to update!
+---VERSION 2.9, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -100,7 +100,7 @@ gameOptionDefaults = {
     PROPORTIONAL_PAYOUTS = false,
     -- The payout per share will be the total dividend divided by the number of shares paid.
     -- e.g, if only 7 shares are owned by players/companies then the dividend is split 7 ways.
-    -- The per share dividend is rounded down before multiplying, with any remainder going to the company unless one player/company owns 100% of the shares.
+    -- The per-share (not total) dividend is rounded up.
 
     ISSUE_SIZE = 10,
     --how many shares the company has. Irrelevant if SHARE_DESCRIPTIONS_ARE_PERCENTAGE is set.
@@ -140,7 +140,7 @@ gameOptionDefaults = {
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.85
+    versionNumber = 2.9
 }
 
 function onSave()
@@ -588,8 +588,23 @@ function buttonHelper(caller, type, color, alt)
                     local xcell = (num-b.START) % (b.VERTICAL_INC)
                     local zcell = math.floor((num-b.START) / b.VERTICAL_INC)
                     local obj = getObjectFromGUID(caller['revenueTrackerGUID'])
+
+                    local xpos = nil
+                    if b.REVERSE_COLS then
+                        xpos = b.lowerright.x - b.cellWidth*(xcell+0.5)
+                    else
+                        xpos = b.upperleft.x + b.cellWidth*(xcell+0.5)
+                    end
+
+                    local zpos = nil
+                    if b.REVERSE_ROWS then
+                        zpos = b.lowerright.z + b.cellHeight*(zcell+0.5)
+                    else
+                        zpos = b.upperleft.z - b.cellHeight*(zcell+0.5)
+                    end
+
                     if (obj) then
-                        obj.setPositionSmooth({b.upperleft.x + b.cellWidth*(xcell+0.5), obj.getPosition().y+1, b.upperleft.z - b.cellHeight*(zcell+0.5)}, false, true)
+                        obj.setPositionSmooth({xpos, obj.getPosition().y+3, zpos}, false, true)
                     else
                         broadcastToColor("Automatic tracking requires the first value to be placed manually.", color, 'Red')
                     end
@@ -778,31 +793,26 @@ end
 
 function transferPropPayouts(caller, payoutTable, amount)
     local someoneGotPaid = false
-    local allOne = true
     local shareCount = 0
     local perShare = 0
-    local remainder = 0
     for k,v in pairs(payoutTable) do
-        if (shareCount~=0 and v[2]~=0) then allOne = false end
         shareCount = shareCount + v[2]
     end
-    perShare = math.floor(amount/shareCount)
-    remainder = amount - shareCount*perShare
+    if amount > 0 then
+        perShare = math.ceil(amount/shareCount)
+    else
+        perShare = math.floor(amount/shareCount)
+    end
 
     for k,v in pairs(payoutTable) do
         local calc = 0
         if (v[2]~=0) then
-            if allOne then
-                calc = amount
-            else
-                calc = v[2]*perShare
-            end
+            calc = v[2]*perShare
             string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2] .. '/' .. shareCount .. ')'
             transferMoneyWithBank(v[1], calc, false, false)
             printToAll(string)
         end
     end
-    if not allOne then Withhold(caller, remainder) end
 end
 
 function transferFlatPayouts(caller, payoutTable, amount)
@@ -1117,12 +1127,17 @@ function onObjectDrop(_, obj)
                             --snap to grid
                             obj.setPositionSmooth({b.upperleft.x + b.cellWidth*(xcell+0.5), pos.y, b.upperleft.z - b.cellHeight*(zcell+0.5)}, false, true)
 
+                            --recalculate for reverse
+                            if b.REVERSE_COLS then xcell = math.floor( (math.abs(pos.x-b.lowerright.x)/b.width)*b.COLS ) end
+                            if b.REVERSE_ROWS then zcell = math.floor( (math.abs(pos.z-b.lowerright.z)/b.height)*b.ROWS ) end
+
                             --set counter based on grid position
                             local company = gameEntities.COMPANIES[str]
                             company['revenueTrackerGUID'] = obj.getGUID()
                             local input = getObjectFromGUID(company.inputCounterGUID)
 
                             local val = b.START + xcell + b.VERTICAL_INC*zcell
+
                             if company.ADJUST_INPUT_BY_REVENUE then
                                 if company.TRACK_REVENUE_PER_SHARE then
                                     input.setValue(val*company.issueSize)
