@@ -60,7 +60,7 @@ gameEntities = {
     }
 }
 
----VERSION 2.9, copy and paste everything below this line to update!
+---VERSION 2.95, copy and paste everything below this line to update!
 
 -----You probably shouldn't edit these unless you know what you're doing.
     -----They can be overwritten by including the option in gameOptions.
@@ -136,11 +136,15 @@ gameOptionDefaults = {
     --If this is set to true, then the set companies are tracked as if they were 10-shares regardless of size, e.g, placing the tracker down on '18' sets the input counter to $180.
 
     PRIVATES_USE_GM_NOTES = false, --If set to true, the script will look for the 'Private#' string in the GM Notes field (change your color to black and right click the object)
+
+    COMPANIES_PAY_FROM_TREASURY = false, --When a company pays out the money comes from its treasury rather than the bank. A message will display if there isn't enough money.
+
+    LABEL_COLOR = {0,0,0}, --the color of a player/company's label text. Red, Green, Blue; values range from 0 to 1 (not 0 to 255).
 }
 
 -----YOU DO NOT NEED TO EDIT ANYTHING BELOW THIS LINE-----
 SAVE_STATE = {
-    versionNumber = 2.9
+    versionNumber = 2.95
 }
 
 function onSave()
@@ -569,10 +573,10 @@ function buttonHelper(caller, type, color, alt)
         printToAll('')
         if (amount > 0) then
             Payout(caller, roundTo(amount/2, caller.halfPayRound, true), color)
-            Withhold(caller, roundTo(amount/2, caller.halfPayRound, false), color)
+            if not caller.COMPANIES_PAY_FROM_TREASURY then Withhold(caller, roundTo(amount/2, caller.halfPayRound, false), color) end
         else
             Payout(caller, roundTo(amount/2, caller.halfPayRound, false), color)
-            Withhold(caller, roundTo(amount/2, caller.halfPayRound, true), color)
+            if not caller.COMPANIES_PAY_FROM_TREASURY then Withhold(caller, roundTo(amount/2, caller.halfPayRound, true), color) end
         end
     end
 
@@ -771,20 +775,40 @@ function transferPayouts(caller, payoutTable, amount)
     if caller.PROPORTIONAL_PAYOUTS then transferPropPayouts(caller, payoutTable, amount) return end
     if caller.COMPANIES_PAY_FLAT_RATE then transferFlatPayouts(caller, payoutTable, amount) return end
 
+    if caller.COMPANIES_PAY_FROM_TREASURY then
+        caller.treasury = caller.treasury - amount
+        updateLabel(caller)
+    end
+
     local someoneGotPaid = false
     for k,v in pairs(payoutTable) do
         if (v[2]~=0) then
             someoneGotPaid = true
             local calc = 0
             local string = ''
-            if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
-                calc = math.ceil(amount*v[2]/100)
-                string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. '%.'
+            if amount > 0 then
+                if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
+                    calc = math.ceil(amount*v[2]/100)
+                    string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. '%.'
+                else
+                    calc = math.ceil(amount*v[2]/caller.issueSize)
+                    string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
+                end
             else
-                calc = math.ceil(amount*v[2]/caller.issueSize)
-                string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
+                if caller.SHARE_DESCRIPTIONS_ARE_PERCENTAGE then
+                    calc = math.floor(amount*v[2]/100)
+                    string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. '%.'
+                else
+                    calc = math.floor(amount*v[2]/caller.issueSize)
+                    string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2]*100/caller.issueSize .. '%).'
+                end
             end
-            transferMoneyWithBank(v[1], calc, false, false)
+            if not caller.COMPANIES_PAY_FROM_TREASURY then
+                transferMoneyWithBank(v[1], calc, false, false)
+            else
+                v[1].treasury = v[1].treasury + calc
+                updateLabel(v[1])
+            end
             printToAll(string)
         end
     end
@@ -792,6 +816,11 @@ function transferPayouts(caller, payoutTable, amount)
 end
 
 function transferPropPayouts(caller, payoutTable, amount)
+    if caller.COMPANIES_PAY_FROM_TREASURY then
+        caller.treasury = caller.treasury - amount
+        updateLabel(caller)
+    end
+
     local someoneGotPaid = false
     local shareCount = 0
     local perShare = 0
@@ -809,7 +838,12 @@ function transferPropPayouts(caller, payoutTable, amount)
         if (v[2]~=0) then
             calc = v[2]*perShare
             string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares (' .. v[2] .. '/' .. shareCount .. ')'
-            transferMoneyWithBank(v[1], calc, false, false)
+            if not caller.COMPANIES_PAY_FROM_TREASURY then
+                transferMoneyWithBank(v[1], calc, false, false)
+            else
+                v[1].treasury = v[1].treasury + calc
+                updateLabel(v[1])
+            end
             printToAll(string)
         end
     end
@@ -829,7 +863,14 @@ function transferFlatPayouts(caller, payoutTable, amount)
                     calc = math.ceil(amount*v[2])
                     string = v[1].NAME .. ' paid ' .. formatLabel(calc) .. ' for ' .. v[2] .. ' shares.'
                 end
-                transferMoneyWithBank(v[1], calc, false, false)
+                if not caller.COMPANIES_PAY_FROM_TREASURY then
+                    transferMoneyWithBank(v[1], calc, false, false)
+                else
+                    caller.treasury = caller.treasury - calc
+                    v[1].treasury = v[1].treasury + calc
+                    updateLabel(v[1])
+                    updateLabel(caller)
+                end
                 printToAll(string)
             end
         end
@@ -1043,6 +1084,11 @@ function updateLabel(table_entry)
     local s = label.getScale()
     local larger = math.max(s.x,s.z)
     button_parameters.scale = {larger/s.x,1,larger/s.z}
+
+    if table_entry.LABEL_COLOR then
+        button_parameters.font_color = table_entry.LABEL_COLOR
+    end
+
     getObjectFromGUID(table_entry.moneyLabelGUID).clearButtons()
     getObjectFromGUID(table_entry.moneyLabelGUID).createButton(button_parameters)
 end
