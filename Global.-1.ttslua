@@ -10,51 +10,100 @@ USE_SAVES = false
 ---------- As of this writing this should only be an issue for BANK_SIZE.
 
 gameOptions = {
-
+    BANK_SIZE = '7000',
+    TRANSACTION_LOG_GUID = 'd1193b',
+    MONEY_SYMBOL = '¥',
+    MONEY_SYMBOL_POSITION = 'left',
+    IPO_ZONE_GUID = 'ccf9fa',
+    USE_PRIVATES = true,
+    BANK_POOL_ZONE_GUIDS = {'8d33e7', '873cfc'},
+    BANK_POOL_SHARES_PAY_COMPANY = true,
 }
 
 gameEntities = {
     OTHER_ACTORS = {
             ['BANK'] = {
-                moneyLabelGUID = '',
+                moneyLabelGUID = '482753',
             },
             ['PRIVATES'] = {
-                payPrivatesButtonGUID = ''
+                payPrivatesButtonGUID = '7bee90'
             },
-            --[[ --Remove this line to use revenue tracker. The values shown are examples.
-            ['REVENUE_TRACKER'] = {
-                {['GUID']='ff23a4', ['ROWS']=2, ['COLS']=32, ['START']=1,},
-                {['GUID']='4b7ea7', ['ROWS']=1, ['COLS']=36, ['START']=65,},
-                --etc.
-            },
-            --]] --Remove this line to use revenue tracker. The values shown are examples.
 
     }, COMPANIES = {
-            ['Example Company'] = {
-                inputCounterGUID = '',
-                moneyLabelGUID = '',
-                charterGUID = '',
+            ['Awa'] = {
+                inputCounterGUID = 'ba0174',
+                moneyLabelGUID = '034829',
+                charterGUID = 'e5781d',
             },
 
-            ['Example Company2'] = {
-                inputCounterGUID = '',
-                moneyLabelGUID = '',
-                charterGUID = '',
+            ['Taka'] = {
+                inputCounterGUID = '366e5b',
+                moneyLabelGUID = 'b32391',
+                charterGUID = 'f7558d',
+            },
+
+            ['Tosak'] = {
+                inputCounterGUID = '4f98b3',
+                moneyLabelGUID = 'c460f4',
+                charterGUID = '70bebc',
+            },
+
+            ['Uwa'] = {
+                inputCounterGUID = 'd69115',
+                moneyLabelGUID = '03fe3a',
+                charterGUID = '48fccb',
+            },
+
+            ['Iyo'] = {
+                inputCounterGUID = '9ec932',
+                moneyLabelGUID = 'ee8d58',
+                charterGUID = '42bd75',
+            },
+
+            ['Sanu'] = {
+                inputCounterGUID = 'd8fb83',
+                moneyLabelGUID = 'b371e6',
+                charterGUID = '07cac3',
+            },
+
+            ['Tosae'] = {
+                inputCounterGUID = '6222d5',
+                moneyLabelGUID = 'e22314',
+                charterGUID = 'b2c49a',
             },
 
             --- etc.
 
     }, PLAYERS = {
-            ['Red'] = {
-                inputCounterGUID = '',
-                moneyLabelGUID = '',
+            ['Blue'] = {
+                inputCounterGUID = 'b22a30',
+                moneyLabelGUID = '6fc30a',
             },
 
             ['White'] = {
-                inputCounterGUID = '',
-                moneyLabelGUID = '',
+                inputCounterGUID = '84fdd3',
+                moneyLabelGUID = '199b7c',
             },
 
+            ['Red'] = {
+                inputCounterGUID = '0306ae',
+                moneyLabelGUID = '5a8af2',
+            },
+
+            ['Green'] = {
+                inputCounterGUID = '10c3ee',
+                moneyLabelGUID = 'c2f0c5',
+            },
+
+            ['Pink'] = {
+                inputCounterGUID = 'c83ebc',
+                moneyLabelGUID = '0b8058',
+            },
+
+            ['Orange'] = {
+                inputCounterGUID = '3fbd13',
+                moneyLabelGUID = '12d11c',
+            },
             --- etc.
 
     }
@@ -77,6 +126,7 @@ gameOptionDefaults = {
     MONEY_SYMBOL_POSITION = nil, --'end' to put at end.
     BANK_POOL_SHARES_PAY_COMPANY = false,
     BANK_POOL_ZONE_GUID = nil,
+    BANK_POOL_ZONE_GUIDS = nil,
     IPO_SHARES_PAY_COMPANY = false,
     IPO_ZONE_GUID = nil,
     CHARTER_SHARES_PAY_COMPANY = false,
@@ -464,15 +514,25 @@ function initBankPool()
 
     --if using bank pool, check to see if the GUID is set.
     if usingBankPool then
-        if not (gameOptions.BANK_POOL_ZONE_GUID) then
-            broadcastToAll('BANK_POOL_SHARES_PAY_COMPANY is set for at least one company but could not find BANK_POOL_ZONE_GUID in gameOptions', ERROR_COLOR) return
+        
+        if (gameOptions.BANK_POOL_ZONE_GUID) then
+            if not getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUID) then
+               broadcastToAll('ERROR: BANK_POOL_ZONE_GUID does not match anything in this mod.', ERROR_COLOR) return
+            end
+            BANK_POOL_ZONE = getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUID)
+        elseif (gameOptions.BANK_POOL_ZONE_GUIDS) then
+            BANK_POOL_ZONE = {}
+            for i, zone in pairs(gameOptions.BANK_POOL_ZONE_GUIDS) do
+                if not getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUIDS[i]) then
+                    broadcastToAll('ERROR: BANK_POOL_ZONE_GUIDS does not match anything in this mod.', ERROR_COLOR) return
+                end
+                
+                table.insert(BANK_POOL_ZONE, i, getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUIDS[i]))
+           end
+        else
+            broadcastToAll('BANK_POOL_SHARES_PAY_COMPANY is set for at least one company but could not find BANK_POOL_ZONE_GUID or BANK_POOL_ZONE_GUIDS in gameOptions', ERROR_COLOR) return
         end
-        if not getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUID) then
-            broadcastToAll('ERROR: BANK_POOL_ZONE_GUID does not match anything in this mod.', ERROR_COLOR) return
-        end
-
-        --error free
-        BANK_POOL_ZONE = getObjectFromGUID(gameOptions.BANK_POOL_ZONE_GUID)
+        
     end
 end
 
@@ -692,7 +752,13 @@ function Payout(caller, amount, color)
             payoutTable[caller.key] = {caller, 0}
             --bank pool
             if caller.BANK_POOL_SHARES_PAY_COMPANY then
-                payoutTable[caller.key][2] = searchContainer(BANK_POOL_ZONE.getObjects(), caller, payoutTable[caller.key][2])
+                if gameOptions.BANK_POOL_ZONE_GUID then
+                    payoutTable[caller.key][2] = searchContainer(BANK_POOL_ZONE.getObjects(), caller, payoutTable[caller.key][2])
+                else
+                    for i, zone in pairs(gameOptions.BANK_POOL_ZONE_GUIDS) do
+                        payoutTable[caller.key][2] = searchContainer(BANK_POOL_ZONE[i].getObjects(), caller, payoutTable[caller.key][2])
+                    end                   
+                end
             end
             --IPO
             if caller.IPO_SHARES_PAY_COMPANY then
